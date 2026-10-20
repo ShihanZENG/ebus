@@ -1,0 +1,189 @@
+GET /api/v1/after-sales  tags=['OMS 售后处理']  req=[]  # List All After Sales
+POST /api/v1/after-sales/{after_sale_id}/resolve  tags=['OMS 售后处理']  req=['after_sale_id:path']  # Resolve After Sale
+POST /api/v1/agent-generations/ads  tags=['经营与客服生成']  req=[]  # Generate Ads
+POST /api/v1/agent-generations/customer/{ticket_id}  tags=['经营与客服生成']  req=['ticket_id:path']  # Generate Customer
+POST /api/v1/agent-generations/profit  tags=['经营与客服生成']  req=[]  # Generate Profit
+POST /api/v1/agent-generations/rules  tags=['经营与客服生成']  req=[]  # Add Rule
+PATCH /api/v1/agent-generations/rules/{rule_id}/status  tags=['经营与客服生成']  req=['rule_id:path']  # Change Rule Status
+GET /api/v1/agent-generations/{generation_id}  tags=['经营与客服生成']  req=['generation_id:path']  # Get Generation
+POST /api/v1/agents/customer/draft/{ticket_id}  tags=['客服 Agent']  req=['ticket_id:path']  # Generate Customer
+POST /api/v1/agents/operations/ask  tags=['运营 Agent']  req=[]  # Ask Operations
+POST /api/v1/agents/product/ask  tags=['商品 Agent']  req=[]  # Ask Product
+POST /api/v1/assistant/ask  tags=['AI 总助手']  req=[]  # Ask
+GET /api/v1/audit-logs  tags=['操作日志']  req=[]  # Logs
+POST /api/v1/auth/login  tags=['登录与会话']  req=[]  # Login
+POST /api/v1/auth/logout  tags=['登录与会话']  req=[]  # Logout
+GET /api/v1/auth/me  tags=['登录与会话']  req=[]  # Me
+GET /api/v1/channels/connections  tags=['渠道对接']  req=[]  # List Connections
+POST /api/v1/channels/connections  tags=['渠道对接']  req=[]  # Create Connection
+GET /api/v1/channels/connections/{connection_id}  tags=['渠道对接']  req=['connection_id:path']  # Connection Detail
+PATCH /api/v1/channels/connections/{connection_id}  tags=['渠道对接']  req=['connection_id:path']  # Edit Connection
+GET /api/v1/channels/connections/{connection_id}/sku-mappings  tags=['渠道对接']  req=['connection_id:path']  # List Sku Mappings
+POST /api/v1/channels/connections/{connection_id}/sku-mappings  tags=['渠道对接']  req=['connection_id:path']  # Create Sku Mapping
+POST /api/v1/channels/connections/{connection_id}/sync  tags=['渠道对接']  req=['connection_id:path']  # Sync Orders
+POST /api/v1/channels/connections/{connection_id}/test  tags=['渠道对接']  req=['connection_id:path']  # Test Connection
+GET /api/v1/channels/orders  tags=['渠道对接']  req=[]  # List Channel Orders
+POST /api/v1/channels/orders/{record_id}/push-shipment  tags=['渠道对接']  req=['record_id:path']  # Push Shipment
+GET /api/v1/channels/sync-jobs  tags=['渠道对接']  req=[]  # List Sync Jobs
+POST /api/v1/channels/webhook/{channel_code}/{shop_code}  tags=['渠道对接']  req=['channel_code:path', 'shop_code:path']  # Receive Webhook
+POST /api/v1/customer-tickets  tags=['客服工单']  req=[]  # Create Ticket
+GET /api/v1/customer-tickets  tags=['客服工单']  req=[]  # List Tickets
+GET /api/v1/customer-tickets/{ticket_id}  tags=['客服工单']  req=['ticket_id:path']  # Get Ticket
+POST /api/v1/customer-tickets/{ticket_id}/assign  tags=['客服工单']  req=['ticket_id:path']  # Assign Ticket
+POST /api/v1/customer-tickets/{ticket_id}/close  tags=['客服工单']  req=['ticket_id:path']  # Close Ticket
+POST /api/v1/customer-tickets/{ticket_id}/escalate  tags=['客服工单']  req=['ticket_id:path']  # Escalate Ticket
+POST /api/v1/customer-tickets/{ticket_id}/notes  tags=['客服工单']  req=['ticket_id:path']  # Add Ticket Note
+POST /api/v1/customer-tickets/{ticket_id}/reopen  tags=['客服工单']  req=['ticket_id:path']  # Reopen Ticket
+POST /api/v1/customer-tickets/{ticket_id}/resolve  tags=['客服工单']  req=['ticket_id:path']  # Resolve Ticket
+POST /api/v1/customer-tickets/{ticket_id}/start  tags=['客服工单']  req=['ticket_id:path']  # Start Ticket
+POST /api/v1/datalab/knowledge/search  tags=['DataLab 数据看板']  req=[]  # Knowledge Search
+GET /api/v1/datalab/overview  tags=['DataLab 数据看板']  req=[]  # Overview
+GET /api/v1/datalab/table/{name}  tags=['DataLab 数据看板']  req=['name:path']  # Query Table
+GET /api/v1/datalab/tables  tags=['DataLab 数据看板']  req=[]  # List Tables
+GET /api/v1/dictionaries  tags=['币种和单位']  req=[]  # List Records
+POST /api/v1/dictionaries  tags=['币种和单位']  req=[]  # Create
+GET /api/v1/dictionaries/{record_id}  tags=['币种和单位']  req=['record_id:path']  # Detail
+PATCH /api/v1/dictionaries/{record_id}  tags=['币种和单位']  req=['record_id:path']  # Update
+GET /api/v1/fba-plans  tags=['FBA 发货计划']  req=[]  # List Plans
+POST /api/v1/fba-plans  tags=['FBA 发货计划']  req=[]  # Create Plan
+GET /api/v1/fba-plans/{plan_id}  tags=['FBA 发货计划']  req=['plan_id:path']  # Plan Detail
+PATCH /api/v1/fba-plans/{plan_id}  tags=['FBA 发货计划']  req=['plan_id:path']  # Update Plan
+POST /api/v1/fba-plans/{plan_id}/approve  tags=['FBA 发货计划']  req=['plan_id:path']  # Approve Plan
+POST /api/v1/fba-plans/{plan_id}/cancel  tags=['FBA 发货计划']  req=['plan_id:path']  # Cancel Plan
+POST /api/v1/fba-plans/{plan_id}/close-short  tags=['FBA 发货计划']  req=['plan_id:path']  # Close Short
+PUT /api/v1/fba-plans/{plan_id}/eta  tags=['FBA 发货计划']  req=['plan_id:path']  # Update Eta
+POST /api/v1/fba-plans/{plan_id}/receipts/{receipt_id}/inspect  tags=['FBA 发货计划']  req=['plan_id:path', 'receipt_id:path']  # Inspect Receipt
+POST /api/v1/fba-plans/{plan_id}/receive  tags=['FBA 发货计划']  req=['plan_id:path']  # Receive Plan
+POST /api/v1/fba-plans/{plan_id}/ship  tags=['FBA 发货计划']  req=['plan_id:path']  # Ship Plan
+POST /api/v1/fba-plans/{plan_id}/submit  tags=['FBA 发货计划']  req=['plan_id:path']  # Submit Plan
+GET /api/v1/generation-reviews  tags=['生成结果审核']  req=[]  # List Generation Reviews
+POST /api/v1/generation-reviews/{generation_id}/decision  tags=['生成结果审核']  req=['generation_id:path']  # Decide Generation
+POST /api/v1/inbound-orders  tags=['WMS 仓储']  req=[]  # Create Inbound
+GET /api/v1/inbound-orders  tags=['WMS 仓储']  req=[]  # List Inbound
+GET /api/v1/inventory  tags=['WMS 仓储']  req=[]  # List Inventory
+GET /api/v1/inventory/allocation-overview  tags=['库存归属与占用']  req=['warehouse_id:query', 'sku_id:query']  # Overview
+GET /api/v1/inventory/dated-supply-demand  tags=['库存归属与占用']  req=['warehouse_id:query', 'sku_id:query', 'business_date:query']  # Dated Supply Demand
+GET /api/v1/inventory/demand-summary  tags=['库存归属与占用']  req=['warehouse_id:query', 'sku_id:query']  # Demand Summary
+PUT /api/v1/inventory/ownership  tags=['库存归属与占用']  req=[]  # Set Ownership
+GET /api/v1/inventory/route-demand  tags=['库存归属与占用']  req=['domestic_warehouse_id:query', 'overseas_warehouse_id:query', 'sku_id:query']  # Route Demand
+GET /api/v1/inventory/transactions  tags=['WMS 仓储']  req=[]  # List Transactions
+GET /api/v1/listings  tags=['商品 Listing 映射']  req=[]  # List Listings
+POST /api/v1/listings  tags=['商品 Listing 映射']  req=[]  # Create Listing
+GET /api/v1/listings/{listing_id}  tags=['商品 Listing 映射']  req=['listing_id:path']  # Listing Detail
+PATCH /api/v1/listings/{listing_id}  tags=['商品 Listing 映射']  req=['listing_id:path']  # Update Listing
+POST /api/v1/listings/{listing_id}/activate  tags=['商品 Listing 映射']  req=['listing_id:path']  # Activate Listing
+POST /api/v1/listings/{listing_id}/deactivate  tags=['商品 Listing 映射']  req=['listing_id:path']  # Deactivate Listing
+GET /api/v1/orders  tags=['OMS 销售订单']  req=[]  # List Orders
+POST /api/v1/orders  tags=['OMS 销售订单']  req=[]  # Create Order
+POST /api/v1/orders/import  tags=['OMS 销售订单']  req=[]  # Import Orders
+GET /api/v1/orders/{order_id}  tags=['OMS 销售订单']  req=['order_id:path']  # Order Detail
+PATCH /api/v1/orders/{order_id}  tags=['OMS 销售订单']  req=['order_id:path']  # Edit Order
+POST /api/v1/orders/{order_id}/after-sales  tags=['OMS 销售订单']  req=['order_id:path']  # Create After Sale
+GET /api/v1/orders/{order_id}/after-sales  tags=['OMS 销售订单']  req=['order_id:path']  # List After Sales
+POST /api/v1/orders/{order_id}/approve  tags=['OMS 销售订单']  req=['order_id:path']  # Approve Order
+POST /api/v1/orders/{order_id}/cancel  tags=['OMS 销售订单']  req=['order_id:path']  # Cancel Order
+POST /api/v1/orders/{order_id}/payments  tags=['OMS 销售订单']  req=['order_id:path']  # Add Payment
+GET /api/v1/orders/{order_id}/payments  tags=['OMS 销售订单']  req=['order_id:path']  # List Payments
+POST /api/v1/orders/{order_id}/shipment-request  tags=['OMS 销售订单']  req=['order_id:path']  # Request Shipment
+GET /api/v1/permissions  tags=['账号与角色']  req=[]  # Permissions
+GET /api/v1/products  tags=['商品']  req=[]  # List Records
+POST /api/v1/products  tags=['商品']  req=[]  # Create
+GET /api/v1/products/{record_id}  tags=['商品']  req=['record_id:path']  # Detail
+PATCH /api/v1/products/{record_id}  tags=['商品']  req=['record_id:path']  # Update
+POST /api/v1/profit-reconciliations/fee-discrepancies  tags=['利润与对账']  req=[]  # Create Fee Discrepancy
+POST /api/v1/purchase-agent/business-analyze/{profile_id}  tags=['采购经营分析']  req=['profile_id:path']  # Analyze
+GET /api/v1/purchase-agent/business-evidence/{profile_id}  tags=['采购经营分析']  req=['profile_id:path']  # Evidence List
+PUT /api/v1/purchase-agent/business-evidence/{profile_id}/{scenario}  tags=['采购经营分析']  req=['profile_id:path', 'scenario:path']  # Evidence Save
+POST /api/v1/purchase-agent/chat  tags=['采购 Agent 线上供需']  req=[]  # Chat
+GET /api/v1/purchase-agent/chats  tags=['采购 Agent 线上供需']  req=[]  # Chats
+GET /api/v1/purchase-agent/coverage-evidence/{profile_id}  tags=['采购 Agent 线上供需']  req=['profile_id:path', 'business_date:query']  # List Evidence
+POST /api/v1/purchase-agent/coverage-evidence/{profile_id}  tags=['采购 Agent 线上供需']  req=['profile_id:path']  # Submit Evidence
+POST /api/v1/purchase-agent/coverage-evidence/{profile_id}/{evidence_id}/review  tags=['采购 Agent 线上供需']  req=['profile_id:path', 'evidence_id:path']  # Review Evidence
+POST /api/v1/purchase-agent/decide  tags=['采购 Agent']  req=[]  # Decide
+GET /api/v1/purchase-agent/drafts  tags=['采购 Agent']  req=[]  # List Drafts
+GET /api/v1/purchase-agent/drafts/{draft_id}  tags=['采购 Agent']  req=['draft_id:path']  # Draft Detail
+POST /api/v1/purchase-agent/drafts/{draft_id}/approve  tags=['采购 Agent']  req=['draft_id:path']  # Approve Draft
+POST /api/v1/purchase-agent/drafts/{draft_id}/reject  tags=['采购 Agent']  req=['draft_id:path']  # Reject Draft
+GET /api/v1/purchase-agent/launch-readiness/{profile_id}  tags=['采购 Agent 线上供需']  req=['profile_id:path', 'business_date:query']  # Launch Readiness
+GET /api/v1/purchase-agent/lookups  tags=['采购 Agent 线上供需']  req=[]  # Lookups
+GET /api/v1/purchase-agent/profiles  tags=['采购 Agent 线上供需']  req=[]  # Profiles
+POST /api/v1/purchase-agent/profiles  tags=['采购 Agent 线上供需']  req=[]  # Profile Create
+PUT /api/v1/purchase-agent/profiles/{profile_id}  tags=['采购 Agent 线上供需']  req=['profile_id:path']  # Profile Update
+GET /api/v1/purchase-agent/runs  tags=['采购 Agent']  req=[]  # List Runs
+GET /api/v1/purchase-agent/runs/{run_id}  tags=['采购 Agent']  req=['run_id:path']  # Run Detail
+GET /api/v1/purchase-agent/runtime  tags=['采购 Agent 线上供需']  req=[]  # Runtime
+GET /api/v1/purchase-agent/sales-coverage/{sku_id}  tags=['采购 Agent 线上供需']  req=['sku_id:path', 'shop_id:query', 'business_date:query']  # Sales Coverage
+GET /api/v1/purchase-agent/sku-readiness/{sku_id}  tags=['采购 Agent 线上供需']  req=['sku_id:path', 'business_date:query']  # Sku Readiness
+GET /api/v1/purchase-agent/suppliers-for-sku  tags=['采购 Agent']  req=['sku_id:query']  # Suppliers For Sku
+POST /api/v1/purchase-agent/supply-decide  tags=['采购 Agent 线上供需']  req=[]  # Supply Decide
+GET /api/v1/purchase-agent/supply-drafts  tags=['采购 Agent 线上供需']  req=[]  # Supply Drafts
+GET /api/v1/purchase-agent/supply-drafts/{draft_id}  tags=['采购 Agent 线上供需']  req=['draft_id:path']  # Supply Draft Detail
+POST /api/v1/purchase-agent/supply-drafts/{draft_id}/approve  tags=['采购 Agent 线上供需']  req=['draft_id:path']  # Supply Approve
+POST /api/v1/purchase-agent/supply-drafts/{draft_id}/reject  tags=['采购 Agent 线上供需']  req=['draft_id:path']  # Supply Reject
+GET /api/v1/purchase-amendments  tags=['SCM 采购变更']  req=[]  # List Amendments
+POST /api/v1/purchase-amendments  tags=['SCM 采购变更']  req=[]  # Create Amendment
+GET /api/v1/purchase-amendments/{amendment_id}  tags=['SCM 采购变更']  req=['amendment_id:path']  # Amendment Detail
+POST /api/v1/purchase-amendments/{amendment_id}/approve  tags=['SCM 采购变更']  req=['amendment_id:path']  # Approve Amendment
+POST /api/v1/purchase-amendments/{amendment_id}/reject  tags=['SCM 采购变更']  req=['amendment_id:path']  # Reject Amendment
+POST /api/v1/purchase-orders  tags=['SCM 采购单']  req=[]  # Create Po
+GET /api/v1/purchase-orders  tags=['SCM 采购单']  req=[]  # List Po
+GET /api/v1/purchase-orders/{po_id}  tags=['SCM 采购单']  req=['po_id:path']  # Po Detail
+PATCH /api/v1/purchase-orders/{po_id}  tags=['SCM 采购单']  req=['po_id:path']  # Edit Po
+POST /api/v1/purchase-orders/{po_id}/approve  tags=['SCM 采购单']  req=['po_id:path']  # Approve Po
+POST /api/v1/purchase-orders/{po_id}/cancel  tags=['SCM 采购单']  req=['po_id:path']  # Cancel Po
+POST /api/v1/purchase-orders/{po_id}/close  tags=['SCM 采购单']  req=['po_id:path']  # Close Po
+POST /api/v1/purchase-orders/{po_id}/receipts  tags=['SCM 采购单']  req=['po_id:path']  # Create Receipt
+GET /api/v1/purchase-orders/{po_id}/receipts  tags=['SCM 采购单']  req=['po_id:path']  # List Receipts
+POST /api/v1/purchase-orders/{po_id}/reject  tags=['SCM 采购单']  req=['po_id:path']  # Reject Po
+POST /api/v1/purchase-orders/{po_id}/submit  tags=['SCM 采购单']  req=['po_id:path']  # Submit Po
+GET /api/v1/purchase-plans  tags=['SCM 采购计划']  req=[]  # List Plans
+POST /api/v1/purchase-plans  tags=['SCM 采购计划']  req=[]  # Create Plan
+GET /api/v1/purchase-plans/{plan_id}  tags=['SCM 采购计划']  req=['plan_id:path']  # Plan Detail
+PATCH /api/v1/purchase-plans/{plan_id}  tags=['SCM 采购计划']  req=['plan_id:path']  # Update Plan
+POST /api/v1/purchase-plans/{plan_id}/approve  tags=['SCM 采购计划']  req=['plan_id:path']  # Approve Plan
+POST /api/v1/purchase-plans/{plan_id}/convert  tags=['SCM 采购计划']  req=['plan_id:path']  # Convert Plan
+POST /api/v1/purchase-plans/{plan_id}/reject  tags=['SCM 采购计划']  req=['plan_id:path']  # Reject Plan
+POST /api/v1/purchase-plans/{plan_id}/submit  tags=['SCM 采购计划']  req=['plan_id:path']  # Submit Plan
+GET /api/v1/replenishment-suggestions  tags=['SCM 补货建议']  req=[]  # List Suggestions
+POST /api/v1/replenishment-suggestions/compute  tags=['SCM 补货建议']  req=[]  # Compute Suggestions
+GET /api/v1/replenishment-suggestions/{suggestion_id}  tags=['SCM 补货建议']  req=['suggestion_id:path']  # Suggestion Detail
+PATCH /api/v1/replenishment-suggestions/{suggestion_id}  tags=['SCM 补货建议']  req=['suggestion_id:path']  # Adjust Suggestion
+POST /api/v1/replenishment-suggestions/{suggestion_id}/convert  tags=['SCM 补货建议']  req=['suggestion_id:path']  # Convert Suggestion
+GET /api/v1/roles  tags=['账号与角色']  req=[]  # Roles
+POST /api/v1/roles  tags=['账号与角色']  req=[]  # Create Role
+PUT /api/v1/roles/{role_id}  tags=['账号与角色']  req=['role_id:path']  # Edit Role
+GET /api/v1/shipments  tags=['WMS 仓储']  req=[]  # List Shipments
+GET /api/v1/shipments/{shipment_id}  tags=['WMS 仓储']  req=['shipment_id:path']  # Shipment Detail
+POST /api/v1/shipments/{shipment_id}/confirm  tags=['WMS 仓储']  req=['shipment_id:path']  # Confirm Shipment
+GET /api/v1/shops  tags=['店铺']  req=[]  # List Records
+POST /api/v1/shops  tags=['店铺']  req=[]  # Create
+GET /api/v1/shops/{record_id}  tags=['店铺']  req=['record_id:path']  # Detail
+PATCH /api/v1/shops/{record_id}  tags=['店铺']  req=['record_id:path']  # Update
+GET /api/v1/skus  tags=['SKU']  req=[]  # List Records
+POST /api/v1/skus  tags=['SKU']  req=[]  # Create
+GET /api/v1/skus/{record_id}  tags=['SKU']  req=['record_id:path']  # Detail
+PATCH /api/v1/skus/{record_id}  tags=['SKU']  req=['record_id:path']  # Update
+GET /api/v1/supplier-quotes  tags=['SCM 供应商报价历史']  req=[]  # List Quotes
+POST /api/v1/supplier-quotes  tags=['SCM 供应商报价历史']  req=[]  # Create Quote
+GET /api/v1/supplier-quotes/{quote_id}  tags=['SCM 供应商报价历史']  req=['quote_id:path']  # Get Quote
+POST /api/v1/supplier-quotes/{quote_id}/accept  tags=['SCM 供应商报价历史']  req=['quote_id:path']  # Accept Quote
+POST /api/v1/supplier-quotes/{quote_id}/reject  tags=['SCM 供应商报价历史']  req=['quote_id:path']  # Reject Quote
+GET /api/v1/suppliers  tags=['供应商']  req=[]  # List Records
+POST /api/v1/suppliers  tags=['供应商']  req=[]  # Create
+GET /api/v1/suppliers/{record_id}  tags=['供应商']  req=['record_id:path']  # Detail
+PATCH /api/v1/suppliers/{record_id}  tags=['供应商']  req=['record_id:path']  # Update
+POST /api/v1/supply-infos  tags=['SCM 供货信息']  req=[]  # Create Supply
+GET /api/v1/supply-infos  tags=['SCM 供货信息']  req=[]  # List Supply
+GET /api/v1/supply-infos/{record_id}  tags=['SCM 供货信息']  req=['record_id:path']  # Supply Detail
+PATCH /api/v1/supply-infos/{record_id}  tags=['SCM 供货信息']  req=['record_id:path']  # Update Supply
+GET /api/v1/users  tags=['账号与角色']  req=[]  # Users
+POST /api/v1/users  tags=['账号与角色']  req=[]  # Add User
+PATCH /api/v1/users/{user_id}  tags=['账号与角色']  req=['user_id:path']  # Edit User
+PUT /api/v1/users/{user_id}/password  tags=['账号与角色']  req=['user_id:path']  # Reset Password
+GET /api/v1/warehouses  tags=['仓库档案']  req=[]  # List Records
+POST /api/v1/warehouses  tags=['仓库档案']  req=[]  # Create
+GET /api/v1/warehouses/{record_id}  tags=['仓库档案']  req=['record_id:path']  # Detail
+PATCH /api/v1/warehouses/{record_id}  tags=['仓库档案']  req=['record_id:path']  # Update
+POST /api/v1/warehouses/{warehouse_id}/inventory/adjust  tags=['WMS 仓储']  req=['warehouse_id:path']  # Adjust Inventory Wh
+GET /health  tags=['运行状态']  req=[]  # Health
+GET /ready  tags=['运行状态']  req=[]  # Ready

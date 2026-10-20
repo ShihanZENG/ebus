@@ -1,0 +1,9 @@
+.product-modal {
+  border: 0;
+  width: min(620px, calc(100% - 30px));
+  margin: auto;
+}
+
+.product-modal::backdrop {
+  background: #132119bd;
+}

@@ -1,0 +1,461 @@
+跨境电商 ERP 后端
+ 0.1.0 
+OAS 3.1
+/openapi.json
+
+第一批后端：身份权限及基础资料。先用 /api/v1/auth/login 登录，再在 Authorize 中填入 token。
+
+Authorize
+运行状态
+GET
+/health
+Health
+GET
+/ready
+Ready
+登录与会话
+POST
+/api/v1/auth/login
+Login
+GET
+/api/v1/auth/me
+Me
+POST
+/api/v1/auth/logout
+Logout
+账号与角色
+GET
+/api/v1/permissions
+Permissions
+GET
+/api/v1/roles
+Roles
+POST
+/api/v1/roles
+Create Role
+PUT
+/api/v1/roles/{role_id}
+Edit Role
+GET
+/api/v1/users
+Users
+POST
+/api/v1/users
+Add User
+PATCH
+/api/v1/users/{user_id}
+Edit User
+PUT
+/api/v1/users/{user_id}/password
+Reset Password
+币种和单位
+GET
+/api/v1/dictionaries
+List Records
+POST
+/api/v1/dictionaries
+Create
+GET
+/api/v1/dictionaries/{record_id}
+Detail
+PATCH
+/api/v1/dictionaries/{record_id}
+Update
+商品
+GET
+/api/v1/products
+List Records
+POST
+/api/v1/products
+Create
+GET
+/api/v1/products/{record_id}
+Detail
+PATCH
+/api/v1/products/{record_id}
+Update
+SKU
+GET
+/api/v1/skus
+List Records
+POST
+/api/v1/skus
+Create
+GET
+/api/v1/skus/{record_id}
+Detail
+PATCH
+/api/v1/skus/{record_id}
+Update
+店铺
+GET
+/api/v1/shops
+List Records
+POST
+/api/v1/shops
+Create
+GET
+/api/v1/shops/{record_id}
+Detail
+PATCH
+/api/v1/shops/{record_id}
+Update
+仓库档案
+GET
+/api/v1/warehouses
+List Records
+POST
+/api/v1/warehouses
+Create
+GET
+/api/v1/warehouses/{record_id}
+Detail
+PATCH
+/api/v1/warehouses/{record_id}
+Update
+供应商
+GET
+/api/v1/suppliers
+List Records
+POST
+/api/v1/suppliers
+Create
+GET
+/api/v1/suppliers/{record_id}
+Detail
+PATCH
+/api/v1/suppliers/{record_id}
+Update
+OMS 销售订单
+GET
+/api/v1/orders
+List Orders
+POST
+/api/v1/orders
+Create Order
+Parameters
+Try it out
+
+No parameters
+
+Request body
+application/json
+Example Value
+Schema
+{
+  "shop_id": "stringstringstringstringstringstring",
+  "source_channel": "manual",
+  "source_order_no": "string",
+  "currency_id": "stringstringstringstringstringstring",
+  "warehouse_id": "stringstringstringstringstringstring",
+  "customer_name": "",
+  "customer_contact": "",
+  "remark": "",
+  "items": [
+    {
+      "sku_id": "stringstringstringstringstringstring",
+      "quantity": 1,
+      "unit_price": 0,
+      "discount_amount": 0
+    }
+  ]
+}
+Responses
+Code	Description	Links
+201	
+
+Successful Response
+
+Media type
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+	No links
+422	
+
+Validation Error
+
+Media type
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+	No links
+GET
+/api/v1/orders/{order_id}
+Order Detail
+POST
+/api/v1/orders/import
+Import Orders
+POST
+/api/v1/orders/{order_id}/approve
+Approve Order
+POST
+/api/v1/orders/{order_id}/shipment-request
+Request Shipment
+POST
+/api/v1/orders/{order_id}/cancel
+Cancel Order
+POST
+/api/v1/orders/{order_id}/payments
+Add Payment
+GET
+/api/v1/orders/{order_id}/payments
+List Payments
+POST
+/api/v1/orders/{order_id}/after-sales
+Create After Sale
+GET
+/api/v1/orders/{order_id}/after-sales
+List After Sales
+OMS 售后处理
+POST
+/api/v1/after-sales/{after_sale_id}/resolve
+Resolve After Sale
+Parameters
+Cancel
+Name	Description
+
+after_sale_id *
+string
+(path)
+	
+Request body
+application/json
+Edit Value
+Schema
+Execute
+Responses
+Code	Description	Links
+200	
+
+Successful Response
+
+Media type
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+	No links
+422	
+
+Validation Error
+
+Media type
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+	No links
+WMS 仓储
+GET
+/api/v1/inventory
+List Inventory
+GET
+/api/v1/inventory/transactions
+List Transactions
+POST
+/api/v1/warehouses/{warehouse_id}/inventory/adjust
+Adjust Inventory Wh
+POST
+/api/v1/inbound-orders
+Create Inbound
+GET
+/api/v1/inbound-orders
+List Inbound
+GET
+/api/v1/shipments
+List Shipments
+Parameters
+Try it out
+Name	Description
+
+status
+string | (string | null)
+(query)
+	
+
+page
+integer
+(query)
+	
+
+Default value : 1
+
+minimum: 1
+
+
+page_size
+integer
+(query)
+	
+
+Default value : 20
+
+maximum: 100
+minimum: 1
+Responses
+Code	Description	Links
+200	
+
+Successful Response
+
+Media type
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+	No links
+422	
+
+Validation Error
+
+Media type
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+	No links
+GET
+/api/v1/shipments/{shipment_id}
+Shipment Detail
+POST
+/api/v1/shipments/{shipment_id}/confirm
+Confirm Shipment
+SCM 采购与补货
+GET
+/api/v1/supplier-skus
+List Supplier Skus
+POST
+/api/v1/supplier-skus
+Add Supplier Sku
+POST
+/api/v1/purchase-orders
+Create Po
+GET
+/api/v1/purchase-orders
+List Pos
+GET
+/api/v1/purchase-orders/{po_id}
+Po Detail
+POST
+/api/v1/purchase-orders/{po_id}/approve
+Approve Po
+POST
+/api/v1/purchase-orders/{po_id}/cancel
+Cancel Po
+POST
+/api/v1/purchase-orders/{po_id}/receipts
+Create Receipt
+GET
+/api/v1/purchase-orders/{po_id}/receipts
+List Receipts
+POST
+/api/v1/replenishment/compute
+Compute Replenishment
+POST
+/api/v1/replenishment
+Create Suggestion
+GET
+/api/v1/replenishment
+List Suggestions
+POST
+/api/v1/replenishment/{sid}/approve
+Approve Suggestion
+POST
+/api/v1/replenishment/{sid}/to-purchase
+Turn Into Po
+操作日志
+GET
+/api/v1/audit-logs
+Logs
+Schemas
+AfterSaleCreateExpand allobject
+AfterSaleResolveExpand allobject
+DictionaryCreateExpand allobject
+DictionaryPatchExpand allobject
+DictionaryReadExpand allobject
+HTTPValidationErrorExpand allobject
+InboundCreateExpand allobject
+InboundItemInputExpand allobject
+InventoryAdjustExpand allobject
+LoginExpand allobject
+OrderApproveExpand allobject
+OrderCancelExpand allobject
+OrderCreateExpand allobject
+OrderImportExpand allobject
+OrderImportRowExpand allobject
+OrderItemInputExpand allobject
+PasswordChangeExpand allobject
+PaymentCreateExpand allobject
+ProductCreateExpand allobject
+ProductPatchExpand allobject
+ProductReadExpand allobject
+PurchaseItemInputExpand allobject
+PurchaseOrderCreateExpand allobject
+PurchaseReceiptCreateExpand allobject
+ReceiptItemInputExpand allobject
+ReplenishmentApproveExpand allobject
+ReplenishmentComputeExpand allobject
+RoleCreateExpand allobject
+SKUCreateExpand allobject
+SKUPatchExpand allobject
+SKUReadExpand allobject
+ShipmentConfirmExpand allobject
+ShipmentRequestExpand allobject
+ShopCreateExpand allobject
+ShopPatchExpand allobject
+ShopReadExpand allobject
+SupplierCreateExpand allobject
+SupplierPatchExpand allobject
+SupplierReadExpand allobject
+SupplierSkuCreateExpand allobject
+UserCreateExpand allobject
+UserPatchExpand allobject
+ValidationErrorExpand allobject
+WarehouseCreateExpand allobject
+WarehousePatchExpand allobject
+WarehouseReadExpand allobject

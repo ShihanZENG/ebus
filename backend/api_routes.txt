@@ -1,0 +1,7 @@
+GET             /openapi.json
+GET             /docs
+GET             /docs/oauth2-redirect
+GET             /redoc
+GET             /health
+GET             /ready
+GET             /api/v1/audit-logs

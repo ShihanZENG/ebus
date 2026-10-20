@@ -1,0 +1,80 @@
+flowchart TB
+    User[老板 / 运营 / 客服人员] -->|问题、授权、纠正、遗忘请求| Gate[AI 总助手：身份权限、意图识别、任务路由]
+
+    subgraph Execution[业务执行与回答]
+        Gate --> Context[上下文组装：当前问题 + 权限范围 + 可引用证据]
+        Context --> Product[商品 Agent]
+        Context --> Ops[运营 / 采购 Agent]
+        Context --> Service[客服 Agent]
+        LLM[LLM 推理与生成] --> Product
+        LLM --> Ops
+        LLM --> Service
+        Product --> Tools[受控工具：查询；写入先形成草稿]
+        Ops --> Tools
+        Service --> Tools
+        Tools --> ERP[ERP 商品 / 采购]
+        Tools --> OMS[OMS 订单]
+        Tools --> WMS[WMS 库存 / 发货]
+        Tools --> CRM[CRM 工单 / 客户服务，待建设]
+        Product --> Draft[答案、建议或操作草稿]
+        Ops --> Draft
+        Service --> Draft
+        Draft --> NeedApproval{涉及业务写入？}
+        NeedApproval -->|否| Reply[带来源与时间范围的答复]
+        NeedApproval -->|是| Approval[有权限人员核对并批准]
+        Approval --> Execute[业务系统执行；回读结果]
+        Execute --> Tools
+        Execute --> Reply
+    end
+
+    subgraph Enterprise[企业事实与知识]
+        ERP --> Data[(企业数据层：主数据、状态、来源、时间)]
+        OMS --> Data
+        WMS --> Data
+        CRM --> Data
+        Channels[Amazon / Shopify / TikTok Shop / Shopee 适配层] --> Data
+        Ads[广告] --> Data
+        Finance[财务] --> Data
+        Logistics[物流轨迹] --> Data
+        Execute --> BusinessAudit[(业务审计日志：人员、动作、结果)]
+        Data --> Retrieval[RAG：已审核业务知识与证据检索]
+        Data --> Tools
+        Retrieval --> Context
+    end
+
+    subgraph Memory[记忆保存、存储与召回：目标能力]
+        Gate --> Recall[记忆召回：身份、店铺、权限、用途、有效期过滤]
+        Recall --> Context
+        Reply --> Extract[候选记忆提取：偏好、已确认事实、任务经验]
+        Execute --> Extract
+        Extract --> SaveGate{可保存？同意 / 来源 / 敏感性 / 去重 / TTL}
+        SaveGate -->|不满足| Discard[不保存；仅保留必要审计元数据]
+        SaveGate -->|会话上下文| Session[(短期记忆：会话缓存；短 TTL)]
+        SaveGate -->|任务经验| Episode[(事件记忆：PostgreSQL；来源与版本)]
+        SaveGate -->|用户或店铺画像候选| ProfileReview[画像更新：证据比对、冲突处理、必要时人工确认]
+        ProfileReview --> Profile[(画像：PostgreSQL；版本化属性，不授予权限)]
+        SaveGate -->|已审核知识| Knowledge[(知识原文：对象存储；向量索引；元数据 PostgreSQL)]
+        Session --> Recall
+        Episode --> Recall
+        Profile --> Recall
+        Knowledge --> Recall
+        Knowledge --> Retrieval
+    end
+
+    subgraph Lifecycle[记忆生命周期与遗忘：目标能力]
+        Session --> Review[定期复核：有效期、来源变更、冲突、使用记录]
+        Episode --> Review
+        Profile --> Review
+        Knowledge --> Review
+        Review -->|仍有效| Recall
+        Review -->|过期或撤回| Forget[遗忘服务：删除或归档；失效缓存和向量索引]
+        User -->|明确要求遗忘| Verify[核验身份、范围及必须保留的业务记录]
+        Verify --> Forget
+        Forget --> Session
+        Forget --> Episode
+        Forget --> Profile
+        Forget --> Knowledge
+        Forget --> DeleteLog[(最小删除凭证与恢复重放清单；不存原文)]
+        DeleteLog --> Backup[备份到期清理；恢复时重放删除]
+        Data --> Retain[ERP / OMS / WMS 法定业务记录按独立留存规则处理]
+    end
