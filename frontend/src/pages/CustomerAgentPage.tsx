@@ -56,7 +56,7 @@ export default function CustomerAgentPage() {
 
   return <Space direction="vertical" size="large" style={{ width: '100%' }}>
     <div>
-      <Typography.Title level={3} style={{ marginBottom: 4 }}>客服 Agent</Typography.Title>
+      <Typography.Title level={3} style={{ marginBottom: 4 }}>客服售后 AI</Typography.Title>
       <Typography.Text type="secondary">基于真实工单与已发布规则生成带引用的回复草稿。</Typography.Text>
     </div>
     <Alert type="warning" showIcon message="仅生成草稿，不会发送给买家" description="规则须匹配店铺市场、类目、生效日期和客服角色。安全信号会要求人工升级；草稿必须经审核，不能自动退款、换货或作合规承诺。" />

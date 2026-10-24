@@ -3,6 +3,7 @@ import { Alert, Button, Card, Input, Select, Space, Spin, Tag, Typography, messa
 import { SendOutlined } from '@ant-design/icons'
 import api from '../api'
 import { useAuth } from '../auth/AuthProvider'
+import AssistantTasksPanel from './AssistantTasksPanel'
 
 type Reference = { ref_id: string; path: string; section: string; start_line: number; end_line: number; excerpt: string }
 type ChatItem = { role: 'user' | 'assistant'; text: string; sources?: string[]; references?: Reference[] }
@@ -99,10 +100,11 @@ export default function AssistantPage() {
 
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <div>
-      <Typography.Title level={4} style={{ margin: 0 }}>AI 总助手</Typography.Title>
-      <Typography.Text type="secondary">用自然语言查询当前账号有权访问的业务数据，或检索本地功能与 OMS 操作文档。</Typography.Text>
+      <Typography.Title level={4} style={{ margin: 0 }}>AI 决策工作台</Typography.Title>
+      <Typography.Text type="secondary">用自然语言发起查询或任务，查看当前账号有权访问的业务数据与任务进度。</Typography.Text>
     </div>
     <Alert type="info" showIcon message="查询保持只读；客服处理记录需人工确认后写入" description="普通问答不会修改单据或执行审批。下面的客服功能只生成内部处理记录草稿，编辑并点击确认后才会写入工单；不会向客户发送消息或改变工单状态。知识问答使用本地文档关键词检索并展示出处，暂非语义向量检索。必要的查询摘要及你填写的处理事实会发送到后台配置的模型服务。" />
+    <AssistantTasksPanel />
     {canReadTickets && <Card title="客服处理记录草稿" extra={<Tag color="blue">需人工确认</Tag>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Typography.Text type="secondary">生成内容仅供内部记录。请只填写已核实的处理事实，不要填写客户联系方式、密码或支付信息。</Typography.Text>
@@ -128,7 +130,7 @@ export default function AssistantPage() {
         </div>}
       </Space>
     </Card>}
-    <Card style={{ minHeight: 360 }}>
+    <Card title="即时问答" style={{ minHeight: 360 }}>
       {!items.length && <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <Typography.Text>可以从这些问题开始：</Typography.Text>
         <Space wrap>{starters.map((text) => <Button key={text} onClick={() => void ask(text)}>{text}</Button>)}</Space>

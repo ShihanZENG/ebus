@@ -166,6 +166,7 @@ export default function Orders() {
   const [list, setList] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [listError, setListError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const [statusFilter, setStatusFilter] = useState<string>()
@@ -199,6 +200,7 @@ export default function Orders() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setListError(null)
     try {
       const [ordersResult, warehousesResult, shopsResult, currenciesResult] = await Promise.allSettled([
         api.get<ListResult<Order>>('/orders', { params: {
@@ -218,7 +220,11 @@ export default function Orders() {
         setList(ordersResult.value.data.items)
         setTotal(ordersResult.value.data.total)
       }
-      else message.error('订单列表加载失败')
+      else {
+        setList([])
+        setTotal(0)
+        setListError('订单列表加载失败，请检查权限或网络后重试')
+      }
       if (warehousesResult.status === 'fulfilled') setWarehouses(warehousesResult.value?.data.items ?? [])
       if (shopsResult.status === 'fulfilled' && shopsResult.value) setShops(shopsResult.value.data.items)
       if (currenciesResult.status === 'fulfilled') setCurrencies(currenciesResult.value?.data.items ?? [])
@@ -472,6 +478,7 @@ export default function Orders() {
       <Space wrap style={{ width: '100%', marginBottom: 12 }}>
         <Input.Search
           allowClear
+          aria-label="搜索来源单号或客户"
           placeholder="搜索来源单号或客户"
           style={{ width: 240 }}
           value={keyword}
@@ -479,6 +486,7 @@ export default function Orders() {
           onSearch={(value) => { setAppliedKeyword(value.trim()); setPage(1) }}
         />
         {canReadShops && <Select
+          aria-label="按店铺筛选订单"
           allowClear
           showSearch
           optionFilterProp="label"
@@ -489,6 +497,7 @@ export default function Orders() {
           options={shops.map((shop) => ({ value: shop.id, label: `${shop.name}（${shop.code}）` }))}
         />}
         <DatePicker.RangePicker
+          aria-label="按创建日期筛选订单"
           value={createdRange}
           onChange={(value) => { setCreatedRange(value); setPage(1) }}
           placeholder={['创建开始日期', '创建结束日期']}
@@ -496,7 +505,8 @@ export default function Orders() {
         <Button onClick={() => void load()}>刷新</Button>
         <Button onClick={() => { setKeyword(''); setAppliedKeyword(''); setStatusFilter(undefined); setShopFilter(undefined); setCreatedRange(null); setPage(1) }}>重置</Button>
       </Space>
-      <div style={{ marginBottom: 8, color: 'rgba(0, 0, 0, 0.45)' }}>共 {total} 条订单</div>
+      {listError && <Alert role="alert" type="error" showIcon message="订单加载失败" description={listError} action={<Button size="small" loading={loading} onClick={() => void load()}>重试</Button>} style={{ marginBottom: 12 }} />}
+      <div aria-live="polite" style={{ marginBottom: 8, color: '#595959' }}>共 {total} 条订单</div>
       <Table<Order>
         rowKey="id"
         size="small"
@@ -517,7 +527,6 @@ export default function Orders() {
             } else setPage(nextPage)
           },
         }}
-        onRow={(row) => ({ onClick: () => void openDetail(row.id), style: { cursor: 'pointer' } })}
       >
         <Table.Column dataIndex="source_order_no" title="来源单号" />
         <Table.Column dataIndex="shop_id" title="店铺" render={(id: string) => shops.find((shop) => shop.id === id)?.name ?? '—'} />
@@ -528,6 +537,7 @@ export default function Orders() {
         <Table.Column dataIndex="created_at" title="创建时间" render={(v: string) => displayUtc(v)} />
         <Table.Column title="操作" render={(_: unknown, row: Order) => (
           <Space onClick={(event) => event.stopPropagation()}>
+            <Button size="small" type="link" aria-label={`查看订单 ${row.source_order_no} 详情`} onClick={() => void openDetail(row.id)}>详情</Button>
             {canWrite && row.source_channel !== 'storefront_demo' && ['draft', 'approved'].includes(row.status) && <Button size="small" type="link" disabled={openingEdit} onClick={() => void openEdit(row.id)}>编辑</Button>}
             {canWrite && row.status === 'draft' && <Button size="small" type="primary" disabled={!canApprove} onClick={() => {
               approveForm.resetFields()
@@ -542,7 +552,7 @@ export default function Orders() {
       </Table>
       </Card>
 
-      <Drawer open={!!detail} onClose={() => { setDetail(null); paymentForm.resetFields(); setPaymentEvidenceFiles([]) }} width={720} title="订单详情" extra={detail && canWrite && detail.source_channel !== 'storefront_demo' && ['draft', 'approved'].includes(detail.status) ? <Button loading={openingEdit} onClick={() => void openEdit(detail.id)}>编辑订单</Button> : undefined}>
+      <Drawer open={!!detail} onClose={() => { setDetail(null); paymentForm.resetFields(); setPaymentEvidenceFiles([]) }} width="min(720px, 100vw)" title="订单详情" extra={detail && canWrite && detail.source_channel !== 'storefront_demo' && ['draft', 'approved'].includes(detail.status) ? <Button loading={openingEdit} onClick={() => void openEdit(detail.id)}>编辑订单</Button> : undefined}>
         {detail && (
           <>
             {detail.storefront && <>
@@ -672,7 +682,7 @@ export default function Orders() {
                   <Button type="primary" loading={savingPayment} disabled={detail.status === 'cancelled'} onClick={() => void addPayment()}>
                     登记付款
                   </Button>
-                  {detail.status === 'cancelled' && <span style={{ marginLeft: 8, color: 'rgba(0, 0, 0, 0.45)' }}>已取消订单不能登记付款</span>}
+                  {detail.status === 'cancelled' && <span style={{ marginLeft: 8, color: '#595959' }}>已取消订单不能登记付款</span>}
                 </Form>
               </>
             )}

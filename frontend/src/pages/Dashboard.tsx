@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, Table, Tabs, Spin, message, Row, Col, Statistic, Tag } from 'antd'
 import api from '../api'
+import DataProvenance, { type DataMeta } from '../components/DataProvenance'
 
 export default function Dashboard() {
   const [data, setData] = useState<any>(null)
@@ -42,6 +43,14 @@ export default function Dashboard() {
         <Col span={6}><Card><Statistic title="退款金额(USD)" value={totalRefund.toFixed(2)} precision={2} prefix="$" valueStyle={{ color: '#cf1322' }} /></Card></Col>
         <Col span={6}><Card><Statistic title="待处理采购单" value={poRows.length} /></Card></Col>
       </Row>
+
+      <div>
+        <DataProvenance title="销售指标" meta={data?.sales_daily?.data_meta as DataMeta | undefined} />
+        <DataProvenance title="库存健康" meta={data?.inventory_health?.data_meta as DataMeta | undefined} />
+        <DataProvenance title="待采购" meta={data?.purchase_open?.data_meta as DataMeta | undefined} />
+        <DataProvenance title="补货审核" meta={data?.replenishment?.data_meta as DataMeta | undefined} />
+        <DataProvenance title="数据质量" meta={data?.data_quality?.data_meta as DataMeta | undefined} />
+      </div>
 
       <Tabs items={[
         {

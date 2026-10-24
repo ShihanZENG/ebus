@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Avatar,
+  Button,
   Dropdown,
   Layout,
+  type MenuProps,
   Space,
   Tabs,
   Tooltip,
@@ -25,17 +27,34 @@ import {
   ShoppingOutlined,
   SoundOutlined,
   UserOutlined,
-  MenuOutlined,
   RobotOutlined,
 } from '@ant-design/icons'
-import { NAV, NAV_PERMISSION, findNavPath } from '../config/menu'
+import { findSystemNavigation, NAV_PERMISSION, findNavPath, SYSTEM_NAV, type NavNode } from '../config/menu'
 import { useAuth } from '../auth/AuthProvider'
+import './aiShell.css'
 
 const { Sider, Content } = Layout
 
 const ICONS: Record<string, JSX.Element> = {
   dashboard: <HomeOutlined />,
   'ai-assistant': <RobotOutlined />,
+  'ai-dashboard': <BarChartOutlined />,
+  'g-ai-business': <RobotOutlined />,
+  'g-ai-execution': <ToolOutlined />,
+  'ai-task-history': <BarChartOutlined />,
+  'lim-console': <ToolOutlined />,
+  'lim-model-gateway': <SettingOutlined />,
+  'g-lim-operations': <BarChartOutlined />,
+  'lim-agent-runtime': <RobotOutlined />,
+  'lim-tool-registry': <ToolOutlined />,
+  'lim-workflow': <ToolOutlined />,
+  'lim-runs': <BarChartOutlined />,
+  'lim-alerts': <SoundOutlined />,
+  'lim-eval': <BarChartOutlined />,
+  'lim-knowledge': <DatabaseOutlined />,
+  'lim-skills': <SettingOutlined />,
+  'lim-replenishment': <InboxOutlined />,
+  storefront: <ShoppingOutlined />,
   'g-catalog': <AppstoreOutlined />,
   'g-sales': <ShoppingOutlined />,
   'g-wms': <InboxOutlined />,
@@ -61,8 +80,11 @@ export default function MainLayout() {
   const { user, logout } = useAuth()
 
   const currentKey = location.pathname.replace(/^\//, '') || 'dashboard'
-  const [openTabs, setOpenTabs] = useState<string[]>(['dashboard'])
+  const currentSystem = findSystemNavigation(location.pathname)
+  const [openTabs, setOpenTabs] = useState<string[]>([currentKey])
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
+  const [aiNavCollapsed, setAiNavCollapsed] = useState(false)
+  const isAi = currentSystem.id === 'ai'
 
   const canOpen = (key: string) => {
     if (key === 'users') return user?.role === 'admin'
@@ -72,20 +94,20 @@ export default function MainLayout() {
   }
 
   const visibleNav = useMemo(() => {
-    const result: typeof NAV = []
-    for (const node of NAV) {
+    const result: NavNode[] = []
+    for (const node of currentSystem.nav) {
       if (!node.children) {
-        if (canOpen(node.key)) result.push(node)
+        if (node.disabled || canOpen(node.key)) result.push(node)
       } else {
-        const children = node.children.filter((c) => canOpen(c.key))
+        const children = node.children.filter((c) => c.disabled || canOpen(c.key))
         if (children.length) result.push({ ...node, children })
       }
     }
     return result
-  }, [user])
+  }, [user, currentSystem])
 
   // Find which group current page belongs to
-  const findGroupKey = (nodes: typeof NAV, key: string): string | null => {
+  const findGroupKey = (nodes: NavNode[], key: string): string | null => {
     for (const node of nodes) {
       if (node.key === key) return node.key
       if (node.children) {
@@ -108,17 +130,18 @@ export default function MainLayout() {
 
   const tabItems = openTabs.map((key) => ({
     key,
-    label: findNavPath(key).at(-1) ?? key,
-    closable: key !== 'dashboard',
+    label: findNavPath(key, currentSystem.nav).at(-1) ?? key,
+    closable: key !== currentSystem.homePage,
   }))
 
   const closeTab = (target: string) => {
     const next = openTabs.filter((key) => key !== target)
-    setOpenTabs(next.length ? next : ['dashboard'])
-    if (currentKey === target) navigate(`/${next.at(-1) ?? 'dashboard'}`)
+    setOpenTabs(next.length ? next : [currentSystem.homePage])
+    if (currentKey === target) navigate(`/${next.at(-1) ?? currentSystem.homePage}`)
   }
 
-  const findFirstLeaf = (node: typeof NAV[number]): string | null => {
+  const findFirstLeaf = (node: NavNode): string | null => {
+    if (node.disabled) return null
     if (!node.children) return node.key
     for (const child of node.children) {
       const leaf = findFirstLeaf(child)
@@ -127,7 +150,34 @@ export default function MainLayout() {
     return null
   }
 
+  const findFirstAccessibleLeaf = (nodes: NavNode[]): string | null => {
+    for (const node of nodes) {
+      if (node.children) {
+        const found = findFirstAccessibleLeaf(node.children)
+        if (found) return found
+      } else if (!node.disabled && canOpen(node.key)) {
+        return node.key
+      }
+    }
+    return null
+  }
+
+  const systemSwitchItems: MenuProps['items'] = [
+    ...SYSTEM_NAV.flatMap((system) => {
+      const firstPage = findFirstAccessibleLeaf(system.nav)
+      return firstPage ? [{
+        key: system.id,
+        label: system.name,
+        onClick: () => navigate(`/${firstPage}`),
+      }] : []
+    }),
+    { type: 'divider' },
+    { key: 'oms-unavailable', label: '独立 OMS（身份接入中）', disabled: true },
+    { key: 'workspace', label: '查看全部工作区', onClick: () => navigate('/workspace') },
+  ]
+
   const handleSidebarClick = (nodeKey: string, hasChildren: boolean) => {
+    if (!hasChildren && visibleNav.find((node) => node.key === nodeKey)?.disabled) return
     if (!hasChildren) {
       navigate(`/${nodeKey}`)
       setExpandedGroup(null)
@@ -149,6 +199,7 @@ export default function MainLayout() {
       label: node.label,
       isActive,
       hasChildren,
+      disabled: node.disabled,
     }
   })
 
@@ -156,8 +207,8 @@ export default function MainLayout() {
   const activeGroup = expandedGroup || currentGroup
   const groupNode = visibleNav.find((n) => n.key === activeGroup)
   // Flatten nested children into a flat list of leaf pages
-  const flattenLeaves = (nodes: typeof NAV): typeof NAV => {
-    const result: typeof NAV = []
+  const flattenLeaves = (nodes: NavNode[]): NavNode[] => {
+    const result: NavNode[] = []
     for (const n of nodes) {
       if (n.children) result.push(...flattenLeaves(n.children))
       else result.push(n)
@@ -167,9 +218,17 @@ export default function MainLayout() {
   const subItems = groupNode?.children ? flattenLeaves(groupNode.children) : []
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className={isAi ? 'ai-system-shell' : undefined} style={{ minHeight: '100vh' }}>
+      <a className="skip-link" href="#main-content">跳到主内容</a>
       {/* Left dark narrow sidebar - Lingxing style */}
-      <Sider
+      {isAi ? <Sider width={224} collapsedWidth={64} collapsed={aiNavCollapsed} breakpoint="lg" onBreakpoint={setAiNavCollapsed} trigger={null} className="ai-system-sidebar" theme="light">
+        <div className="ai-system-brand"><button aria-label={aiNavCollapsed ? '展开 AI 系统导航' : '收起 AI 系统导航'} onClick={() => setAiNavCollapsed((value) => !value)}><RobotOutlined /></button>{!aiNavCollapsed && <span><strong>CommerceOS</strong><small>AI 智能经营系统</small></span>}</div>
+        <nav aria-label="AI 系统导航">{visibleNav.map((node) => <div key={node.key}>
+          {node.children && !aiNavCollapsed && <div className="ai-system-nav-group">{node.label}</div>}
+          {(node.children ? flattenLeaves(node.children) : [node]).map((leaf) => <Tooltip key={leaf.key} title={aiNavCollapsed ? leaf.label : undefined} placement="right"><button className={`ai-system-nav-item ${currentKey === leaf.key ? 'active' : ''}`} disabled={leaf.disabled} aria-label={leaf.label} aria-current={currentKey === leaf.key ? 'page' : undefined} onClick={() => { navigate(`/${leaf.key}`); if (window.matchMedia('(max-width: 991px)').matches) setAiNavCollapsed(true) }}><span className="ai-system-nav-number">{leaf.label.slice(0, 2)}</span>{!aiNavCollapsed && <span>{leaf.label.replace(/^\d+\s*/, '').replace('（规划中）', '')}</span>}{leaf.disabled && !aiNavCollapsed && <small>规划</small>}</button></Tooltip>)}
+        </div>)}</nav>
+        <button className="ai-system-workspace" aria-label="返回系统工作区" onClick={() => navigate('/workspace')}><AppstoreOutlined />{!aiNavCollapsed && '系统工作区'}</button>
+      </Sider> : <Sider
         width={SIDEBAR_WIDTH}
         theme="dark"
         style={{
@@ -179,7 +238,8 @@ export default function MainLayout() {
         }}
       >
         {/* Logo */}
-        <div
+        <div aria-hidden="true"
+          title={currentSystem.name}
           style={{
             height: 48,
             display: 'flex',
@@ -191,45 +251,51 @@ export default function MainLayout() {
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          O
+          {currentSystem.mark}
         </div>
         {/* Menu items - icon on top, text below */}
-        <div style={{ padding: '8px 0' }}>
+        <nav aria-label="主导航" style={{ padding: '8px 0' }}>
           {sidebarItems.map((item) => (
             <Tooltip key={item.key} title={item.label} placement="right">
-              <div
+              <button
+                type="button"
+                aria-label={item.label}
+                aria-disabled={item.disabled || undefined}
+                disabled={item.disabled}
+                aria-expanded={item.hasChildren ? expandedGroup === item.key || currentGroup === item.key : undefined}
+                aria-controls={item.hasChildren ? 'sidebar-submenu' : undefined}
+                aria-current={!item.hasChildren && currentKey === item.key ? 'page' : undefined}
                 onClick={() => handleSidebarClick(item.key, item.hasChildren)}
                 style={{
+                  width: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   padding: '10px 0',
+                  font: 'inherit',
                   cursor: 'pointer',
                   color: '#ffffff',
                   background: item.isActive ? 'rgba(91,140,255,0.25)' : 'transparent',
                   borderRight: item.isActive ? '3px solid #5b8cff' : '3px solid transparent',
-                  fontSize: 20,
                   transition: 'all 0.2s',
+                  borderTop: 0,
+                  borderLeft: 0,
+                  borderBottom: 0,
+                  borderRadius: 0,
                 }}
               >
-                <div style={{ marginBottom: 4 }}>{item.icon}</div>
-                <div style={{ fontSize: 12, whiteSpace: 'nowrap', fontWeight: 500 }}>{item.label}</div>
-              </div>
+                <span aria-hidden="true" style={{ marginBottom: 4 }}>{item.icon}</span>
+                <span style={{ fontSize: 11, lineHeight: 1.2, maxWidth: 76, textAlign: 'center', overflowWrap: 'anywhere', fontWeight: 500 }}>{item.label}</span>
+              </button>
             </Tooltip>
           ))}
-        </div>
-        {/* Bottom - more menu */}
-        <div style={{ position: 'absolute', bottom: 8, width: '100%', textAlign: 'center' }}>
-          <Tooltip title="更多" placement="right">
-            <MenuOutlined style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16, cursor: 'pointer' }} />
-          </Tooltip>
-        </div>
-      </Sider>
+        </nav>
+      </Sider>}
 
       {/* Right side: top tab bar + content */}
       <Layout>
         {/* Top tab bar */}
-        <div
+        <div className={isAi ? 'ai-system-topbar' : undefined}
           style={{
             background: SIDEBAR_BG,
             display: 'flex',
@@ -250,7 +316,12 @@ export default function MainLayout() {
             onEdit={(key, action) => { if (action === 'remove') closeTab(String(key)) }}
             style={{ flex: 1, minWidth: 0, marginBottom: -1 }}
           />
-          <Space size={16}>
+          <Space size={16} className={isAi ? 'ai-system-account' : undefined}>
+            <Dropdown menu={{ items: systemSwitchItems }}>
+              <Button type="text" aria-label={`切换系统，当前为${currentSystem.name}`} style={{ height: 36, paddingInline: 8, color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
+                <AppstoreOutlined /> {currentSystem.name} ▾
+              </Button>
+            </Dropdown>
             <Typography.Link href={API_DOCS_URL} target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12 }}>
               接口文档
             </Typography.Link>
@@ -261,17 +332,19 @@ export default function MainLayout() {
                 ],
               }}
             >
-              <Space style={{ cursor: 'pointer' }}>
+              <Button type="text" aria-label={`打开 ${user?.username ?? '用户'} 菜单`} style={{ height: 36, paddingInline: 8 }}>
                 <Avatar size={24} icon={<UserOutlined />} style={{ background: '#5b8cff' }} />
                 <span style={{ color: '#fff', fontSize: 13 }}>{user?.username ?? '未登录'}</span>
-              </Space>
+              </Button>
             </Dropdown>
           </Space>
         </div>
 
         {/* Sub-menu row (when group has children) */}
-        {subItems.length > 0 && (
-          <div
+        {!isAi && subItems.length > 0 && (
+          <nav
+            id="sidebar-submenu"
+            aria-label={groupNode ? `${groupNode.label} 页面` : '子导航'}
             style={{
               background: '#fff',
               borderBottom: '1px solid #f0f0f0',
@@ -286,28 +359,34 @@ export default function MainLayout() {
             {subItems.map((sub) => {
               const isActive = currentKey === sub.key
               return (
-                <div
+                <button
                   key={sub.key}
+                  type="button"
+                  aria-disabled={sub.disabled || undefined}
+                  disabled={sub.disabled}
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => navigate(`/${sub.key}`)}
                   style={{
+                    border: 0,
+                    background: isActive ? '#5b8cff' : 'transparent',
+                    font: 'inherit',
                     padding: '4px 14px',
                     cursor: 'pointer',
                     fontSize: 13,
                     borderRadius: 4,
-                    color: isActive ? '#fff' : '#555',
-                    background: isActive ? '#5b8cff' : 'transparent',
+                    color: isActive ? '#fff' : sub.disabled ? '#aaa' : '#555',
                     whiteSpace: 'nowrap',
                   }}
                 >
                   {sub.label}
-                </div>
+                </button>
               )
             })}
-          </div>
+          </nav>
         )}
 
         {/* Main content */}
-        <Content style={{ padding: 16, background: '#f0f2f5', minWidth: 0 }}>
+        <Content id="main-content" role="main" tabIndex={-1} style={{ padding: 16, background: '#f0f2f5', minWidth: 0 }}>
           <Outlet />
         </Content>
       </Layout>

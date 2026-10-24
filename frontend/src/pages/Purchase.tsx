@@ -113,6 +113,7 @@ export default function Purchase() {
   const [skus, setSkus] = useState<Ref[]>([])
   const [whs, setWhs] = useState<Ref[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [calcOpen, setCalcOpen] = useState(false)
   const [calcResult, setCalcResult] = useState<Suggestion | null>(null)
   const [form] = Form.useForm()
@@ -126,6 +127,10 @@ export default function Purchase() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelTarget, setCancelTarget] = useState<PurchaseOrder | null>(null)
   const [cancelForm] = Form.useForm()
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState<PurchaseOrder | null>(null)
+  const [rejecting, setRejecting] = useState(false)
+  const [rejectForm] = Form.useForm()
   // 补货建议调整弹窗
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [adjustTarget, setAdjustTarget] = useState<Suggestion | null>(null)
@@ -183,6 +188,7 @@ export default function Purchase() {
 
   const load = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [p, s, sup, sk, w] = await Promise.allSettled([
         canReadPurchaseOrders ? api.get<ListResult<PurchaseOrder>>('/purchase-orders', { params: { page_size: 50 } }) : Promise.resolve(null),
@@ -196,7 +202,7 @@ export default function Purchase() {
       if (sup.status === 'fulfilled' && sup.value) setSuppliers(sup.value.data.items)
       if (sk.status === 'fulfilled' && sk.value) setSkus(sk.value.data.items)
       if (w.status === 'fulfilled' && w.value) setWhs(w.value.data.items)
-      if ([p, s, sup, sk, w].some((result) => result.status === 'rejected')) message.error('部分采购资料加载失败')
+      if ([p, s, sup, sk, w].some((result) => result.status === 'rejected')) setLoadError('部分采购资料加载失败，请刷新后重试')
     } finally {
       setLoading(false)
     }
@@ -218,10 +224,17 @@ export default function Purchase() {
     void load().catch(() => {})
   }
 
-  /** 驳回：POST /purchase-orders/{id}/reject，仅 submitted 可用。 */
-  const reject = async (id: string) => {
-    await api.post(`/purchase-orders/${id}/reject`)
+  /** 驳回：必须填写原因，并由后端保存在采购单备注及审计快照中。 */
+  const submitReject = async () => {
+    const values = await rejectForm.validateFields()
+    setRejecting(true)
+    try {
+      await api.post(`/purchase-orders/${rejectTarget!.id}/reject`, { reason: values.reason.trim() })
+    } finally { setRejecting(false) }
     message.success('已驳回')
+    setRejectOpen(false)
+    rejectForm.resetFields()
+    setRejectTarget(null)
     void load().catch(() => {})
   }
 
@@ -353,6 +366,8 @@ export default function Purchase() {
 
   return (
     <>
+      {loadError && <Alert role="alert" type="error" showIcon message="采购资料加载失败" description={loadError} action={<Button size="small" loading={loading} onClick={() => void load()}>重试</Button>} style={{ marginBottom: 16 }} />}
+      {loading && <span role="status" aria-live="polite" className="visually-hidden">正在加载采购资料</span>}
       <Tabs
         activeKey={location.pathname === '/replenishment' ? 'suggest' : 'po'}
         onChange={(key) => navigate(key === 'suggest' ? '/replenishment' : '/purchase-orders')}
@@ -413,15 +428,11 @@ export default function Purchase() {
                                 审批
                               </Button>
                             </Popconfirm>
-                            <Popconfirm
-                              title="确认驳回该采购单？"
-                              okButtonProps={{ danger: true }}
-                              onConfirm={() => void reject(r.id).catch(() => {})}
-                            >
-                              <Button size="small" danger disabled={!canWritePurchaseOrders}>
-                                驳回
-                              </Button>
-                            </Popconfirm>
+                            <Button size="small" danger disabled={!canWritePurchaseOrders} onClick={() => {
+                              rejectForm.resetFields()
+                              setRejectTarget(r)
+                              setRejectOpen(true)
+                            }}>驳回</Button>
                           </>
                         )}
                         {r.status === 'approved' && (
@@ -548,7 +559,7 @@ export default function Purchase() {
         </Form>
       </Modal>
 
-      <Drawer open={!!detail} title={`采购详情 · ${detail?.po_no ?? ''}`} width={950} onClose={() => setDetail(null)}>
+      <Drawer open={!!detail} title={`采购详情 · ${detail?.po_no ?? ''}`} width="min(950px, 100vw)" onClose={() => setDetail(null)}>
         {detail && <>
           <Descriptions bordered column={2} size="small" items={[
             { key: 'supplier', label: '供应商', children: nameOf(suppliers, detail.supplier_id) },
@@ -661,6 +672,32 @@ export default function Purchase() {
         </Form>
       </Modal>
 
+      {/* 驳回采购单 */}
+      <Modal
+        open={rejectOpen}
+        title={rejectTarget ? `驳回采购单 - ${rejectTarget.po_no}` : '驳回采购单'}
+        onCancel={() => setRejectOpen(false)}
+        onOk={() => void submitReject().catch(() => {})}
+        confirmLoading={rejecting}
+        okText="确认驳回"
+        okButtonProps={{ danger: true }}
+        destroyOnClose
+      >
+        <Form form={rejectForm} layout="vertical">
+          <Form.Item
+            name="reason"
+            label="驳回原因"
+            rules={[
+              { required: true, message: '请填写驳回原因' },
+              { max: 480, message: '不能超过 480 字' },
+              { validator: (_, value) => value?.trim() ? Promise.resolve() : Promise.reject(new Error('驳回原因不能为空')) },
+            ]}
+          >
+            <Input.TextArea rows={3} maxLength={480} placeholder="请说明驳回原因" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* 取消采购单 */}
       <Modal
         open={cancelOpen}
@@ -747,7 +784,7 @@ export default function Purchase() {
               建议补货：
               <b style={{ fontSize: 18, color: '#2b5cff' }}>{calcResult.suggested_qty}</b> 件
             </div>
-            <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 4 }}>
+            <div style={{ color: '#595959', fontSize: 12, marginTop: 4 }}>
               公式：round(日均销量 × 交期) + 安全库存 − 有效库存 − 在途
             </div>
           </div>

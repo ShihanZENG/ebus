@@ -8,10 +8,13 @@ export function cartTotal(cart) {
   return (cart.reduce((sum, item) => sum + toPence(item.price) * item.quantity, 0) / 100).toFixed(2)
 }
 
-export function addItem(cart, item) {
+export function addItem(cart, item, quantity = 1) {
+  if (!Number.isInteger(quantity) || quantity < 1) throw new Error('数量必须为正整数')
   const row = cart.find(r => r.variant_id === item.variant_id)
-  if ((row?.quantity || 0) + 1 > item.available_qty) throw new Error('可用库存不足')
-  return row ? cart.map(r => r === row ? { ...item, quantity: r.quantity + 1 } : r) : [...cart, { ...item, quantity: 1 }]
+  const total = (row?.quantity || 0) + quantity
+  if (total > 20) throw new Error('单个规格最多购买 20 件')
+  if (total > item.available_qty) throw new Error('可用库存不足')
+  return row ? cart.map(r => r === row ? { ...item, quantity: total } : r) : [...cart, { ...item, quantity }]
 }
 
 export function prepareSubmission(previous, payload) {

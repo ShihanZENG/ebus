@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#dfe2e6"/>
+  <g fill="#41566b" opacity="0.9">
+    <path d="M250 150 L350 150 L350 460 L320 460 L300 300 L280 460 L250 460 Z"/>
+  </g>
+  <text x="300" y="540" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#41566b">LINEN TROUSER / 演示</text>
+</svg>

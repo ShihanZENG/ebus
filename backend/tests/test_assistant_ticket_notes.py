@@ -34,7 +34,7 @@ def test_ticket_note_draft_returns_text_without_mutation_or_sensitive_prompt_dat
 
     captured = {}
 
-    def fake_completion(messages, tools, timeout):
+    def fake_completion(messages, tools, timeout, **kwargs):
         captured.update(messages=messages, tools=tools, timeout=timeout)
         return {'content': '已核对物流状态，等待承运商更新后继续跟进。'}
 
@@ -62,7 +62,7 @@ def test_ticket_note_draft_requires_ticket_read_permission_and_shop_scope(setup,
     client, auth, _ = setup
     shop, *_ = demo_basics(client, auth)
     ticket = make_ticket(client, auth, shop['id'])
-    monkeypatch.setattr(assistant, 'completion', lambda *_: {'content': '草稿'})
+    monkeypatch.setattr(assistant, 'completion', lambda *_, **kwargs: {'content': '草稿'})
 
     assistant_only_role = role_with_permissions(client, auth, 'assistant_only_reader', ['assistant:read'])
     _, assistant_only = create_user(client, auth, role=assistant_only_role, username='assistant_only')
@@ -86,7 +86,7 @@ def test_ticket_note_draft_rejects_blank_model_output_without_creating_event(set
     ticket = make_ticket(client, auth, shop['id'])
     with sessions(engine)() as db:
         event_count = db.scalar(select(func.count()).select_from(CustomerTicketEvent))
-    monkeypatch.setattr(assistant, 'completion', lambda *_: {'content': '  '})
+    monkeypatch.setattr(assistant, 'completion', lambda *_, **kwargs: {'content': '  '})
 
     response = client.post('/api/v1/assistant/ticket-note-draft', headers=auth, json={
         'ticket_id': ticket['id'], 'context': '已核查订单',

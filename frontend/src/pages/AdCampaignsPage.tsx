@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, Button, Card, Col, DatePicker, Input, InputNumber, Modal, Row, Select, Space, Statistic,
-  Table, Tabs, Tag, Typography, Upload, message,
+  Table, Tabs, Tag, Tooltip, Typography, Upload, message,
 } from 'antd'
 import type { UploadProps } from 'antd'
 import api from '../api'
 import { useAuth } from '../auth/AuthProvider'
+import DataProvenance, { type DataMeta } from '../components/DataProvenance'
 
 interface Shop {
   id: string
@@ -28,6 +29,13 @@ interface CampaignRow {
   clicks: number
   orders: number
   attributed_sales: string
+  metrics: {
+    ctr_percent: number | null
+    cpc: number | null
+    cvr_percent: number | null
+    acos_percent: number | null
+    roas: number | null
+  }
   sku_code?: string | null
   target_acos_percent?: string | null
   mapped_sku?: string | null
@@ -47,6 +55,8 @@ interface DiagnosticSetting {
 
 interface ImportBatch {
   id: string
+  actor_name: string | null
+  content_hash: string
   shop_id: string
   source_name: string
   row_count: number
@@ -88,23 +98,28 @@ interface ListResult<T> {
 
 function DataLabSnapshot() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([])
+  const [dataMeta, setDataMeta] = useState<DataMeta | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const load = async () => {
     setLoading(true)
     setError('')
     try {
-      const response = await api.get<{ rows?: Record<string, unknown>[] }>('/datalab/table/dws_ads_campaign', { params: { limit: 100 } })
+      const response = await api.get<{ rows?: Record<string, unknown>[]; data_meta: DataMeta }>('/datalab/table/dws_ads_campaign', { params: { limit: 100 } })
       setRows(Array.isArray(response.data.rows) ? response.data.rows : [])
+      setDataMeta(response.data.data_meta)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'DataLab 数据读取失败')
+      setDataMeta({ source: 'datalab', source_mode: 'warehouse_snapshot', data_status: 'unavailable',
+        upstream_updated_at: null, upstream_freshness: 'not_provided', sample_status: 'unclassified' })
     } finally {
       setLoading(false)
     }
   }
   useEffect(() => { void load() }, [])
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-    <Alert type="info" showIcon message="DataLab 活动快照" description="上游最多返回 100 条记录，且没有报表日期、币种和完整记录数；此处只供参考，诊断请使用已导入的逐日报表。" />
+    <DataProvenance title="DataLab 广告活动" meta={dataMeta} />
+    <Alert type="info" showIcon message="DataLab 活动快照（非广告平台实时同步）" description="上游最多返回 100 条记录，且没有报表日期、币种、完整记录数或更新时间；此处只供参考，诊断请使用已导入的逐日报表。" />
     {error && <Alert type="error" showIcon message="DataLab 数据暂不可用" description={error} action={<Button size="small" onClick={() => void load()}>重试</Button>} />}
     <Card title="DataLab 广告活动" extra={<Button onClick={() => void load()} loading={loading}>刷新</Button>}>
       <Table<Record<string, unknown>> size="small" rowKey={(_, index) => String(index)} dataSource={rows} loading={loading}
@@ -129,6 +144,7 @@ export default function AdCampaignsPage() {
   const [uploadShopId, setUploadShopId] = useState<string>()
   const [filterShopId, setFilterShopId] = useState<string>()
   const [records, setRecords] = useState<CampaignRow[]>([])
+  const [campaignMeta, setCampaignMeta] = useState<DataMeta | null>(null)
   const [total, setTotal] = useState(0)
   const [batches, setBatches] = useState<ImportBatch[]>([])
   const [loading, setLoading] = useState(false)
@@ -171,7 +187,7 @@ export default function AdCampaignsPage() {
   const loadRecords = useCallback(async (nextPage = page) => {
     setLoading(true)
     try {
-      const response = await api.get<ListResult<CampaignRow>>('/ads-reports/campaigns', {
+      const response = await api.get<ListResult<CampaignRow> & { data_meta: DataMeta }>('/ads-reports/campaigns', {
         params: {
           shop_id: filterShopId,
           date_from: dateRange[0],
@@ -182,8 +198,11 @@ export default function AdCampaignsPage() {
       })
       setRecords(response.data.items)
       setTotal(response.data.total)
+      setCampaignMeta(response.data.data_meta)
       setPage(nextPage)
-    } catch { /* API interceptor displays the request error. */ } finally {
+    } catch {
+      setCampaignMeta({ source: 'ads_report_import', source_mode: 'file_import', data_status: 'unavailable', sample_status: 'unclassified' })
+    } finally {
       setLoading(false)
     }
   }, [filterShopId, dateRange, page])
@@ -368,6 +387,8 @@ export default function AdCampaignsPage() {
       <Typography.Title level={3} style={{ margin: 0 }}>广告管理</Typography.Title>
       <Typography.Text type="secondary">先导入逐日广告报表，再按币种查看表现。导入只记录数据，不会修改广告平台投放。</Typography.Text>
     </div>
+    <DataProvenance title="逐日广告指标" meta={campaignMeta} />
+    <Alert type="info" showIcon message="日报数据来自手动 CSV 导入，不代表广告平台实时同步" description="本页的最近导入时间和批次记录用于追溯文件；DataLab 快照在单独页签展示。" />
     <Tabs items={[
       {
         key: 'daily', label: '日报导入与分析', children: <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
@@ -458,7 +479,7 @@ export default function AdCampaignsPage() {
                 {currencyTotals.length ? <Space wrap>{currencyTotals.map(([currency, values]) => <Tag key={currency}>{currency}：花费 {values.spend.toFixed(2)} · 销售额 {values.sales.toFixed(2)}</Tag>)}</Space> : <Typography.Text type="secondary">暂无记录</Typography.Text>}
               </Card></Col>
             </Row>
-            <Table<CampaignRow> rowKey="id" size="small" dataSource={records} loading={loading} scroll={{ x: 2070 }}
+            <Table<CampaignRow> rowKey="id" size="small" dataSource={records} loading={loading} scroll={{ x: 2470 }}
               pagination={{ current: page, pageSize, total, showSizeChanger: false, onChange: (nextPage) => void loadRecords(nextPage), showTotal: (count) => `共 ${count} 条` }}
               locale={{ emptyText: '还没有导入广告日报' }} columns={[
                 { title: '日期', dataIndex: 'report_date', width: 115 },
@@ -471,8 +492,11 @@ export default function AdCampaignsPage() {
                 { title: '曝光', dataIndex: 'impressions', width: 100 },
                 { title: '点击', dataIndex: 'clicks', width: 90 },
                 { title: '归因订单', dataIndex: 'orders', width: 100 },
-                { title: 'ACOS', width: 90, render: (_, row) => Number(row.attributed_sales) > 0 ? `${(Number(row.spend) / Number(row.attributed_sales) * 100).toFixed(1)}%` : '—' },
-                { title: 'ROAS', width: 90, render: (_, row) => Number(row.spend) > 0 ? `${(Number(row.attributed_sales) / Number(row.spend)).toFixed(2)}x` : '—' },
+                { title: <Tooltip title="点击数 ÷ 曝光量 × 100%；分母为曝光量，分母为 0 或字段缺失时显示“—”。">CTR</Tooltip>, width: 90, render: (_, row) => row.metrics.ctr_percent === null ? '—' : `${row.metrics.ctr_percent.toFixed(2)}%` },
+                { title: <Tooltip title="花费 ÷ 点击数；分母为点击数，分母为 0 或字段缺失时显示“—”。">CPC</Tooltip>, width: 110, render: (_, row) => row.metrics.cpc === null ? '—' : `${row.currency} ${row.metrics.cpc.toFixed(2)}` },
+                { title: <Tooltip title="归因订单数 ÷ 点击数 × 100%；分母为点击数，分母为 0 或字段缺失时显示“—”。">CVR</Tooltip>, width: 90, render: (_, row) => row.metrics.cvr_percent === null ? '—' : `${row.metrics.cvr_percent.toFixed(2)}%` },
+                { title: <Tooltip title="花费 ÷ 归因销售额 × 100%；分母为归因销售额，分母为 0 或字段缺失时显示“—”。">ACOS</Tooltip>, width: 90, render: (_, row) => row.metrics.acos_percent === null ? '—' : `${row.metrics.acos_percent.toFixed(2)}%` },
+                { title: <Tooltip title="归因销售额 ÷ 花费；分母为花费，分母为 0 或字段缺失时显示“—”。">ROAS</Tooltip>, width: 90, render: (_, row) => row.metrics.roas === null ? '—' : `${row.metrics.roas.toFixed(2)}x` },
                 { title: 'SKU', dataIndex: 'sku_code', width: 120, render: (value?: string) => value || '—' },
                 { title: '目标 ACOS', width: 200, render: (_, row) => {
                   const key = `${row.shop_id}:${row.campaign_id}`
@@ -536,13 +560,16 @@ export default function AdCampaignsPage() {
           </Modal>
 
           <Card title="最近导入批次">
-            <Table<ImportBatch> rowKey="id" size="small" dataSource={batches} pagination={{ pageSize: 10 }} scroll={{ x: 850 }} columns={[
+            <Table<ImportBatch> rowKey="id" size="small" dataSource={batches} pagination={{ pageSize: 10 }} scroll={{ x: 1320 }} columns={[
+              { title: '批次号', dataIndex: 'id', width: 140, render: (value: string) => <Tooltip title={value}><Typography.Text copyable={{ text: value }}>{value.slice(0, 8)}…</Typography.Text></Tooltip> },
               { title: '导入时间', dataIndex: 'created_at', width: 180, render: (value: string) => new Date(value.endsWith('Z') ? value : `${value}Z`).toLocaleString('zh-CN') },
+              { title: '导入人', dataIndex: 'actor_name', width: 110, render: (value: string | null) => value || '未知' },
               { title: '来源文件', dataIndex: 'source_name' },
               { title: '报表日期', width: 220, render: (_, row) => `${row.report_date_from} 至 ${row.report_date_to}` },
               { title: '币种', dataIndex: 'currencies', render: (values: string[]) => values.join('、') },
               { title: '行数', dataIndex: 'row_count' },
               { title: '新增 / 更正', render: (_, row) => `${row.inserted_count} / ${row.corrected_count}` },
+              { title: '文件 SHA-256', dataIndex: 'content_hash', width: 170, render: (value: string) => <Tooltip title={value}><Typography.Text copyable={{ text: value }}>{value.slice(0, 12)}…</Typography.Text></Tooltip> },
             ]} locale={{ emptyText: '暂无导入批次' }} />
           </Card>
         </Space>,

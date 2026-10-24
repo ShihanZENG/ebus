@@ -180,3 +180,24 @@ def test_shipment_list_and_detail(setup):
     assert detail['source_order_no'] == 'WMS-LIST'
     assert len(detail['items']) == 1
     assert detail['items'][0]['quantity'] == 1
+
+
+def test_shipment_detail_deep_link_respects_warehouse_scope(setup):
+    client, auth, _ = setup
+    shop, warehouse, skus, currency = demo_basics(client, auth)
+    assert inbound(client, auth, warehouse, skus[0], qty=2).status_code == 201
+    order = make_order(client, auth, shop, skus[0], currency, source_no='WMS-SCOPE-DEEP-LINK',
+                       warehouse=warehouse, qty=1).json()
+    assert client.post(f"/api/v1/orders/{order['id']}/approve", headers=auth,
+                       json={'warehouse_id': warehouse['id']}).status_code == 200
+    requested = client.post(f"/api/v1/orders/{order['id']}/shipment-request", headers=auth, json={})
+    assert requested.status_code == 200, requested.text
+    role = client.post('/api/v1/roles', headers=auth, json={
+        'code': 'shipment_deep_link_reader', 'name': '出库深链范围验收', 'permissions': ['shipments:read'],
+    }).json()
+    from test_erp import create_user
+    _, limited = create_user(client, auth, role=role['id'], username='shipmentdeeplinkreader',
+                             warehouse_scope=[])
+
+    response = client.get(f"/api/v1/shipments/{requested.json()['shipment_id']}", headers=limited)
+    assert response.status_code == 404

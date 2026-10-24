@@ -10,81 +10,13 @@ from sqlalchemy import select, func, or_, and_, update
 from pydantic import Field, field_validator
 from . import models as m, schemas as s
 from .security import session_db, require, record_audit, role_for, require_scope
+from .provenance import local_record_meta
 from . import wms
 
-CENTS = Decimal('0.01')
-
-
-def money(value) -> Decimal:
-    return Decimal(str(value)).quantize(CENTS, rounding=ROUND_HALF_UP)
-
-
-def auditable(data):
-    """审计快照：把 Decimal 等不可 JSON 序列化的类型转成原生类型。"""
-    return jsonable_encoder(data)
-
-
-def order_snapshot(order, items=None):
-    data = {c.name: getattr(order, c.name) for c in m.SalesOrder.__table__.columns}
-    for k in ('total_amount', 'discount_amount', 'grand_total'):
-        data[k] = money(data[k])
-    if items is not None:
-        data['items'] = [item_snapshot(x) for x in items]
-    return data
-
-
-def item_snapshot(item):
-    data = {c.name: getattr(item, c.name) for c in m.SalesOrderItem.__table__.columns}
-    for k in ('unit_price', 'discount_amount', 'line_total'):
-        data[k] = money(data[k])
-    return data
-
-
-def payment_snapshot(p):
-    data = {c.name: getattr(p, c.name) for c in m.PaymentRecord.__table__.columns}
-    data['amount'] = money(data['amount'])
-    data['fee_amount'] = money(data['fee_amount'] or 0)
-    data['net_amount'] = money(data['amount'] - data['fee_amount'])
-    return data
-
-
-def recognized_payment_condition():
-    """Keep historical receipts compatible; recognize only explicitly verified new receipts."""
-    return or_(
-        m.PaymentRecord.record_type == 'legacy',
-        and_(m.PaymentRecord.record_type == 'real',
-             m.PaymentRecord.reconciliation_status == 'verified'),
-    )
-
-
-def after_sale_snapshot(a):
-    data = {c.name: getattr(a, c.name) for c in m.AfterSale.__table__.columns}
-    data['amount'] = money(data['amount'])
-    return data
-
-
-def visible_shop_ids(user):
-    """返回用户可见的店铺 id 列表；None 表示全范围。"""
-    return user.shop_scope
-
-
-def ensure_warehouse_scope(user, warehouse_id):
-    """拒绝访问用户仓库范围之外的履约仓；None 范围表示全范围。"""
-    require_scope(user, warehouse_id=warehouse_id, status_code=403,
-                 warehouse_message='仓库不在可访问范围内')
-
-
-def get_order_or_404(db, user, order_id, *, lock=False) -> m.SalesOrder:
-    stmt = select(m.SalesOrder).where(m.SalesOrder.id == order_id)
-    if lock:
-        stmt = stmt.with_for_update()
-    order = db.scalar(stmt)
-    if order is None:
-        raise HTTPException(404, '订单不存在')
-    scope = visible_shop_ids(user)
-    if scope is not None and order.shop_id not in scope:
-        raise HTTPException(404, '订单不存在或不在可访问店铺范围内')
-    return order
+from . import oms_state
+from .orders_common import (CENTS, money, auditable, order_snapshot, item_snapshot,
+                            payment_snapshot, after_sale_snapshot, recognized_payment_condition,
+                            visible_shop_ids, ensure_warehouse_scope, get_order_or_404)
 
 
 def validate_order_refs(db, shop_id, currency_id, warehouse_id, item_inputs):
@@ -199,7 +131,12 @@ def backfill_order_time(order_id: str, payload: OrderTimeBackfill,
 
 @router.get('')
 def list_orders(status: s.OrderStatus | None = None,
+                order_status: str | None = None,
+                payment_status: str | None = None,
+                fulfillment_status: str | None = None,
                 shop_id: str | None = None,
+                warehouse_id: str | None = None,
+                channel: str | None = Query(None, max_length=80),
                 q: str | None = Query(None, max_length=120),
                 date_from: str | None = None,
                 date_to: str | None = None,
@@ -213,6 +150,16 @@ def list_orders(status: s.OrderStatus | None = None,
         conditions.append(m.SalesOrder.shop_id == shop_id)
     if status:
         conditions.append(m.SalesOrder.status == status)
+    if order_status:
+        conditions.append(m.SalesOrder.order_status == order_status)
+    if payment_status:
+        conditions.append(m.SalesOrder.payment_status == payment_status)
+    if fulfillment_status:
+        conditions.append(m.SalesOrder.fulfillment_status == fulfillment_status)
+    if warehouse_id:
+        conditions.append(m.SalesOrder.warehouse_id == warehouse_id)
+    if channel:
+        conditions.append(m.SalesOrder.source_channel == channel)
     if q:
         like = '%' + q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
         conditions.append(or_(m.SalesOrder.source_order_no.ilike(like, escape='\\'),
@@ -261,6 +208,8 @@ def create_order(payload: s.OrderCreate, db=Depends(session_db), user=Depends(re
     db.add_all(items)
     db.flush()
     result = order_snapshot(order, items)
+    oms_state.add_event(db, order.id, 'status_change', dimension='order', from_value=None,
+                        to_value='created', source='erp', message='订单创建', actor_id=user.id)
     record_audit(db, user, 'orders', order.id, 'create', after=auditable(result))
     db.commit()
     return result
@@ -280,6 +229,8 @@ def import_batch_snapshot(batch, detail=False):
 def order_summary(db=Depends(session_db), user=Depends(require('orders:read'))):
     scope = visible_shop_ids(user)
     conditions = [] if scope is None else [m.SalesOrder.shop_id.in_(scope)]
+    total = db.scalar(select(func.count()).select_from(m.SalesOrder).where(*conditions)) or 0
+    latest_updated_at = db.scalar(select(func.max(m.SalesOrder.updated_at)).where(*conditions))
     by_status = dict(db.execute(select(m.SalesOrder.status, func.count()).where(*conditions)
                                .group_by(m.SalesOrder.status)).all())
     amounts = db.execute(select(m.SalesOrder.currency_id, m.Dictionary.code,
@@ -290,7 +241,9 @@ def order_summary(db=Depends(session_db), user=Depends(require('orders:read'))):
                          .order_by(m.Dictionary.code)).all()
     return {'total': sum(by_status.values()), 'by_status': by_status,
             'by_currency': [{'currency_id': currency_id, 'code': code, 'amount': str(money(amount))}
-                            for currency_id, code, amount in amounts]}
+                            for currency_id, code, amount in amounts],
+            'data_meta': local_record_meta(record_count=total, latest_updated_at=latest_updated_at,
+                update_semantics='sales_orders.updated_at 在当前授权店铺范围内的最大值；不是平台同步时间')}
 
 
 @router.get('/import-batches')
@@ -334,6 +287,27 @@ def order_detail(order_id: str, request: Request, db=Depends(session_db), user=D
         after_sales = db.scalars(select(m.AfterSale).where(m.AfterSale.order_id == order.id)
                                  .order_by(m.AfterSale.created_at.desc(), m.AfterSale.id)).all()
         result['after_sales'] = [after_sale_snapshot(a) for a in after_sales]
+    if role.code == 'admin' or 'order_events:read' in role.permissions:
+        events = db.scalars(select(m.OrderEvent).where(
+            m.OrderEvent.order_id == order.id).order_by(m.OrderEvent.created_at, m.OrderEvent.id)).all()
+        result['events'] = [{c.name: getattr(e, c.name) for c in m.OrderEvent.__table__.columns}
+                            for e in events]
+    if role.code == 'admin' or 'order_reservations:read' in role.permissions:
+        reservations = db.scalars(select(m.OrderReservation).where(
+            m.OrderReservation.order_id == order.id).order_by(m.OrderReservation.changed_at)).all()
+        result['reservations'] = [{c.name: getattr(r, c.name) for c in m.OrderReservation.__table__.columns}
+                                  for r in reservations]
+        decisions = db.scalars(select(m.RoutingDecision).where(
+            m.RoutingDecision.order_id == order.id).order_by(m.RoutingDecision.created_at)).all()
+        result['routing_decisions'] = [{c.name: getattr(d, c.name) for c in m.RoutingDecision.__table__.columns}
+                                       for d in decisions]
+    if role.code == 'admin' or 'order_exceptions:read' in role.permissions:
+        open_exceptions = db.scalars(select(m.OrderException).where(
+            m.OrderException.order_id == order.id,
+            m.OrderException.status.in_(['open', 'processing']))
+            .order_by(m.OrderException.created_at)).all()
+        result['open_exceptions'] = [{c.name: getattr(x, c.name) for c in m.OrderException.__table__.columns}
+                                     for x in open_exceptions]
     return result
 
 
@@ -384,9 +358,12 @@ def edit_order(order_id: str, payload: s.OrderPatch, db=Depends(session_db), use
             db.delete(item)
         order.total_amount, order.discount_amount, order.grand_total = total, discount, grand
         db.add_all(replacements)
-    if order.status == 'approved':
-        order.status = 'draft'
+    if order.order_status == 'confirmed':
+        oms_state.set_state(db, order, 'order', 'created', actor_id=user.id,
+                            message='编辑订单后回到待审核')
     db.flush()
+    oms_state.add_event(db, order.id, 'note', source='erp',
+                        message=f'订单编辑：{payload.reason}', actor_id=user.id)
     current_items = replacements if replacements is not None else old_items
     result = order_snapshot(order, current_items)
     audit_after = {**result, 'edit_reason': payload.reason}
@@ -513,15 +490,18 @@ def approve_order(order_id: str, payload: s.OrderApprove, db=Depends(session_db)
     order = get_order_or_404(db, user, order_id, lock=True)
     if order.source_channel == 'storefront_demo' and payload.warehouse_id != order.warehouse_id:
         raise HTTPException(422, '商城演示订单只能使用站点指定履约仓')
-    if order.status != 'draft':
+    if order.order_status != 'created':
         raise HTTPException(422, f'只有待审核订单可以审核，当前状态 {order.status}')
     wh = db.get(m.Warehouse, payload.warehouse_id)
     if not wh or not wh.is_active:
         raise HTTPException(422, '履约仓库不存在或已停用')
     ensure_warehouse_scope(user, payload.warehouse_id)
     before = order_snapshot(order)
-    order.status = 'approved'
     order.warehouse_id = payload.warehouse_id
+    oms_state.set_state(db, order, 'order', 'confirmed', actor_id=user.id, message='订单审核通过')
+    db.add(m.RoutingDecision(order_id=order.id, rule_id=None, status='manual',
+                             warehouse_id=payload.warehouse_id, allocations=[],
+                             reason='审核时人工指定履约仓'))
     db.flush()
     record_audit(db, user, 'orders', order.id, 'approve', before=auditable(before), after=auditable(order_snapshot(order)))
     db.commit()
@@ -532,7 +512,7 @@ def approve_order(order_id: str, payload: s.OrderApprove, db=Depends(session_db)
 def request_shipment(order_id: str, payload: s.ShipmentRequest, db=Depends(session_db), user=Depends(require('orders:write'))):
     """提交发货申请：WMS 检查并预留库存，成功后订单进入待仓库拣货状态。"""
     order = get_order_or_404(db, user, order_id, lock=True)
-    if order.status != 'approved':
+    if order.order_status != 'confirmed':
         raise HTTPException(422, f'只有已审核订单可以申请发货，当前状态 {order.status}')
     warehouse_id = payload.warehouse_id or order.warehouse_id
     if order.source_channel == 'storefront_demo' and warehouse_id != order.warehouse_id:
@@ -544,15 +524,33 @@ def request_shipment(order_id: str, payload: s.ShipmentRequest, db=Depends(sessi
         raise HTTPException(422, '履约仓库不存在或已停用')
     ensure_warehouse_scope(user, warehouse_id)
     before = order_snapshot(order)
-    order.warehouse_id = warehouse_id
-    if payload.remark:
-        order.remark = (order.remark + ' | ' if order.remark else '') + payload.remark
+    lines = {}
+    for item in db.scalars(select(m.SalesOrderItem).where(
+            m.SalesOrderItem.order_id == order.id)).all():
+        lines[item.sku_id] = lines.get(item.sku_id, 0) + item.quantity
     try:
-        shipment = wms.reserve_order_stock(db, order)
+        with db.begin_nested():
+            order.warehouse_id = warehouse_id
+            if payload.remark:
+                order.remark = (order.remark + ' | ' if order.remark else '') + payload.remark
+            shipment = wms.reserve_order_stock(db, order)
     except HTTPException as e:
-        db.rollback()
+        # 预留失败：保存点回滚（订单与库存不变），单独登记失败记录与缺货异常。
+        from .oms_exceptions import open_exception
+        failure = open_exception(db, order, 'stockout', f'库存预留失败：{e.detail}',
+                                 detail={'warehouse_id': warehouse_id, 'message': e.detail},
+                                 actor_id=user.id)
+        oms_state.reservation_record(db, order, 'failed', warehouse_id=warehouse_id,
+                                     lines=lines, error=e.detail, actor_id=user.id,
+                                     idempotency_key=f'reserve-fail:{order.id}:{failure.id}')
+        record_audit(db, user, 'orders', order.id, 'shipment_request_failed', after={'error': e.detail})
+        db.commit()
         raise e
-    order.status = 'shipping_requested'
+    oms_state.set_state(db, order, 'fulfillment', 'allocated', actor_id=user.id,
+                        message='库存预留成功，等待仓库拣货')
+    oms_state.reservation_record(db, order, 'reserved', warehouse_id=warehouse_id,
+                                 shipment_id=shipment.id, lines=lines, actor_id=user.id,
+                                 idempotency_key=f'reserve:{shipment.id}')
     db.flush()
     result = order_snapshot(order)
     result['shipment_id'] = shipment.id
@@ -564,13 +562,17 @@ def request_shipment(order_id: str, payload: s.ShipmentRequest, db=Depends(sessi
 @router.post('/{order_id}/cancel')
 def cancel_order(order_id: str, payload: s.OrderCancel, db=Depends(session_db), user=Depends(require('orders:write'))):
     order = get_order_or_404(db, user, order_id, lock=True)
-    if order.status not in ('draft', 'approved', 'shipping_requested'):
+    if order.order_status != 'created' and not (
+            order.order_status == 'confirmed' and order.fulfillment_status in ('unallocated', 'allocated')):
         raise HTTPException(422, f'只有未发货订单可以取消，当前状态 {order.status}')
     before = order_snapshot(order)
     # 如果已申请发货（已预留库存），先释放预留
-    if order.status == 'shipping_requested':
+    if order.fulfillment_status == 'allocated':
         wms.release_order_stock(db, order)
-    order.status = 'cancelled'
+        oms_state.set_state(db, order, 'fulfillment', 'unallocated', actor_id=user.id,
+                            message='订单取消，预留库存已释放')
+    oms_state.set_state(db, order, 'order', 'cancelled', actor_id=user.id,
+                        message=f'订单取消：{payload.reason}')
     order.cancel_reason = payload.reason
     db.flush()
     record_audit(db, user, 'orders', order.id, 'cancel', before=auditable(before), after=auditable(order_snapshot(order)))
@@ -603,6 +605,9 @@ def add_payment(order_id: str, payload: s.PaymentCreate, db=Depends(session_db),
     )
     db.add(record)
     db.flush()
+    oms_state.refresh_payment_status(db, order, actor_id=user.id,
+                                     idempotency_key=f'payment:{record.id}')
+    db.flush()
     result = payment_snapshot(record)
     record_audit(db, user, 'payment_records', record.id, 'create', after=auditable(result))
     db.commit()
@@ -618,6 +623,23 @@ def list_payments(order_id: str, db=Depends(session_db), user=Depends(require('p
 
 
 # ---------------- 售后 ----------------
+
+@router.get('/{order_id}/events')
+def order_events(order_id: str, event_type: str | None = Query(None, max_length=40),
+                 page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
+                 db=Depends(session_db), user=Depends(require('order_events:read'))):
+    """订单事件时间线：状态变更、预留、物流、异常、同步处理记录（按发生顺序）。"""
+    order = get_order_or_404(db, user, order_id)
+    conditions = [m.OrderEvent.order_id == order.id]
+    if event_type:
+        conditions.append(m.OrderEvent.event_type == event_type)
+    total = db.scalar(select(func.count()).select_from(m.OrderEvent).where(*conditions))
+    rows = db.scalars(select(m.OrderEvent).where(*conditions)
+                      .order_by(m.OrderEvent.created_at, m.OrderEvent.id)
+                      .offset((page - 1) * page_size).limit(page_size)).all()
+    return {'items': [{c.name: getattr(e, c.name) for c in m.OrderEvent.__table__.columns} for e in rows],
+            'total': total, 'page': page, 'page_size': page_size}
+
 
 @router.post('/{order_id}/after-sales', status_code=201)
 def create_after_sale(order_id: str, payload: s.AfterSaleCreate, db=Depends(session_db), user=Depends(require('after_sales:write'))):
@@ -749,6 +771,9 @@ def register_refund(after_sale_id: str, payload: s.RefundExecution,
         'currency_id': order.currency_id, 'mode': 'manual_record', 'actor_id': user.id,
         'recorded_at': datetime.now(timezone.utc).isoformat()}
     db.flush()
+    oms_state.refresh_payment_status(db, order, actor_id=user.id,
+                                     idempotency_key=f'refund:{record.id}')
+    db.flush()
     result = after_sale_snapshot(record)
     record_audit(db, user, 'after_sales', record.id, 'register_refund', after=auditable(result))
     db.commit()
@@ -799,6 +824,10 @@ def receive_return(after_sale_id: str, payload: s.ReturnReceipt,
     record.return_receipt = {**payload.model_dump(), 'actor_id': user.id,
         'recorded_at': datetime.now(timezone.utc).isoformat(), 'stock_ownership': 'public'}
     db.flush()
+    oms_state.add_event(db, order.id, 'status_change', source='erp',
+                        message=f'退货验收入库：{payload.reference_no}',
+                        payload={'after_sale_id': record.id, 'warehouse_id': payload.warehouse_id},
+                        actor_id=user.id)
     result = after_sale_snapshot(record)
     record_audit(db, user, 'after_sales', record.id, 'receive_return', after=auditable(result))
     db.commit()

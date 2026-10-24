@@ -1,0 +1,52 @@
+.customer-account { max-width: 1080px; margin: 0 auto; }
+.customer-heading, .customer-list-toolbar, .customer-order header, .customer-order footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.customer-auth-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e4ddd5; margin: 32px 0; background: #fffefa; }
+.customer-auth-story { background: #ece7de; padding: 48px; color: #4e463b; }
+.customer-auth-story > span { font-size: 10px; letter-spacing: 2px; }
+.customer-auth-story h2 { font-size: clamp(26px, 3vw, 38px); font-weight: 500; line-height: 1.55; margin: 28px 0; }
+.customer-auth-story p, .customer-auth-story li { line-height: 2; font-size: 14px; }
+.customer-auth-story ul { padding-left: 18px; margin-top: 36px; }
+.customer-auth-card { padding: 40px; min-width: 0; }
+.customer-auth-tabs { display: flex; gap: 24px; border-bottom: 1px solid #ded7cd; margin-bottom: 28px; }
+.customer-auth-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 12px 0; background: transparent; }
+.customer-auth-tabs button[aria-pressed=true] { border-bottom-color: #6c493c; color: #6c493c; }
+.customer-auth-card form { display: grid; gap: 20px; }
+.customer-auth-card label { display: grid; gap: 9px; font-size: 13px; }
+.customer-auth-card input { box-sizing: border-box; width: 100%; padding: 12px; background: #fff; border: 1px solid #d9d1c6; }
+.customer-auth-card .primary { width: 100%; margin-top: 8px; }
+.customer-auth-card .muted { font-size: 12px; line-height: 1.8; margin-top: 24px; }
+.customer-list-toolbar { margin: 28px 0 18px; }
+.customer-order { border: 1px solid #e4ddd5; padding: 24px; margin-bottom: 18px; background: #fffefa; }
+.customer-order header { font-size: 12px; overflow-wrap: anywhere; border-bottom: 1px solid #eee8e0; padding-bottom: 14px; }
+.customer-order header strong { color: #6a7453; }
+.customer-order footer { border-top: 1px solid #eee8e0; padding-top: 16px; margin-top: 18px; }
+.customer-order small { color: #80786f; }
+.customer-empty { padding: 48px 24px; text-align: center; background: #f3eee6; }
+.customer-empty h2 { font-weight: 500; }
+.customer-pagination { display: flex; justify-content: center; align-items: center; gap: 20px; }
+.customer-guest-note { border-top: 1px solid #e4ddd5; padding-top: 24px; margin-top: 36px; font-size: 13px; line-height: 1.7; color: #7d746a; }
+.customer-checkout-note { padding: 16px; margin-bottom: 20px; border: 1px solid #ded7cd; background: #f5f0e8; line-height: 1.8; }
+.header-actions .customer-nav { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 900px) { .header-actions button.customer-nav { display: inline-block; }.header-actions { gap: 12px; flex-wrap: wrap; }.header { grid-template-columns: minmax(0, 1fr) auto; } }
+@media (max-width: 480px) { .header-actions { max-width: 155px; justify-content: flex-end; gap: 3px 10px; }.header-actions button.customer-nav { font-size: 10px; max-width: 100px; }.header .brand { min-width: 100px; } }
+@media (max-width: 700px) { .customer-auth-grid { grid-template-columns: 1fr; margin-top: 20px; }.customer-auth-story { display: none; }.customer-auth-card { padding: 22px; }.customer-order { padding: 16px; }.customer-order footer button { width: 100%; } }
+.customer-tabs { display: flex; gap: 8px; flex-wrap: wrap }
+.customer-tabs button { border: 1px solid #c7ccc3; background: transparent }
+.customer-tabs button[aria-pressed="true"] { background: #682e3f; color: #fff; border-color: #682e3f }
+.customer-profile { margin-top: 8px }
+.customer-profile h3 { margin: 22px 0 10px }
+.profile-form { display: grid; gap: 14px; max-width: 420px; margin-bottom: 24px }
+.profile-form label { display: grid; gap: 6px; font-size: 13px }
+.profile-form input { min-height: 44px; padding: 8px 10px; border: 1px solid #b6bfae; background: #fffef9; color: inherit; font: inherit }
+.customer-panel { margin-top: 24px; max-width: 640px }
+.customer-panel form { display: grid; gap: 14px; margin: 18px 0 24px }
+.customer-panel label { display: grid; gap: 6px; font-size: 13px }
+.customer-panel input { min-height: 44px; padding: 8px 10px; border: 1px solid #b6bfae; background: #fffef9; color: inherit; font: inherit }
+.address-card { border: 1px solid #e4ddd5; background: #fffefa; padding: 16px; margin-bottom: 12px; line-height: 1.7 }
+.address-card small { color: #80786f }
+.address-card .address-actions { display: flex; gap: 10px; margin-top: 10px }
+.address-form { border-top: 1px solid #e4ddd5; margin-top: 20px; padding-top: 16px }
+.address-form h3 { font-weight: 500; margin-bottom: 12px }
+.payment-ok { color: #4e6b46 }
+.customer-order footer small { display: inline-block; margin-left: 8px }
+@media (max-width: 700px) { .address-card .address-actions { flex-wrap: wrap } }

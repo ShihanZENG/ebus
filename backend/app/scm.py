@@ -8,6 +8,7 @@ from sqlalchemy import select, func
 
 from . import models as m, schemas as s, wms
 from .security import session_db, require, record_audit
+from .provenance import local_record_meta
 
 
 def safe(data):
@@ -215,7 +216,11 @@ def purchase_summary(db=Depends(session_db), user=Depends(require('purchase_orde
     conditions = [] if user.warehouse_scope is None else [m.PurchaseOrder.warehouse_id.in_(user.warehouse_scope)]
     counts = dict(db.execute(select(m.PurchaseOrder.status, func.count())
         .where(*conditions).group_by(m.PurchaseOrder.status)).all())
-    return {'total': sum(counts.values()), 'by_status': counts}
+    total = sum(counts.values())
+    latest_updated_at = db.scalar(select(func.max(m.PurchaseOrder.updated_at)).where(*conditions))
+    return {'total': total, 'by_status': counts,
+            'data_meta': local_record_meta(record_count=total, latest_updated_at=latest_updated_at,
+                update_semantics='purchase_orders.updated_at 在当前授权仓库范围内的最大值')}
 
 
 @po_router.get('/{po_id}')
@@ -300,13 +305,17 @@ def approve_po(po_id: str, db=Depends(session_db), user=Depends(require('purchas
 
 
 @po_router.post('/{po_id}/reject')
-def reject_po(po_id: str, db=Depends(session_db), user=Depends(require('purchase_orders:write'))):
+def reject_po(po_id: str, payload: s.PurchaseOrderReject,
+              db=Depends(session_db), user=Depends(require('purchase_orders:write'))):
     po = get_po_or_404(db, po_id)
     require_po_access(user, po)
     if po.status != 'submitted':
         raise HTTPException(422, f'只有已提交的采购单可以驳回，当前状态 {po.status}')
     before = po_snapshot(po)
     po.status = 'rejected'
+    rejection_note = f'驳回原因：{payload.reason}'
+    separator = ' | ' if po.remark else ''
+    po.remark = f'{po.remark[:max(0, 500 - len(separator) - len(rejection_note))]}{separator}{rejection_note}'
     db.flush()
     record_audit(db, user, 'purchase_orders', po.id, 'reject', before=safe(before), after=safe(po_snapshot(po)))
     db.commit()
@@ -501,11 +510,19 @@ def list_suggestions(status: str | None = None, sku_id: str | None = None, wareh
 @replenish_router.get('/summary')
 def replenishment_summary(db=Depends(session_db), user=Depends(require('replenishment:read'))):
     conditions = [m.ReplenishmentSuggestion.status == 'pending', m.ReplenishmentSuggestion.suggested_qty > 0]
+    source_conditions = []
     if user.warehouse_scope is not None:
         conditions.append(m.ReplenishmentSuggestion.warehouse_id.in_(user.warehouse_scope))
+        source_conditions.append(m.ReplenishmentSuggestion.warehouse_id.in_(user.warehouse_scope))
     count, sku_count = db.execute(select(func.count(), func.count(func.distinct(m.ReplenishmentSuggestion.sku_id)))
         .select_from(m.ReplenishmentSuggestion).where(*conditions)).one()
-    return {'pending_count': count, 'pending_sku_count': sku_count}
+    source_count = db.scalar(select(func.count()).select_from(m.ReplenishmentSuggestion)
+                              .where(*source_conditions)) or 0
+    latest_updated_at = db.scalar(select(func.max(m.ReplenishmentSuggestion.updated_at)
+        ).where(*source_conditions))
+    return {'pending_count': count, 'pending_sku_count': sku_count,
+            'data_meta': local_record_meta(record_count=source_count, latest_updated_at=latest_updated_at,
+                update_semantics='replenishment_suggestions.updated_at 在当前授权仓库范围内的最大值')}
 
 
 @replenish_router.get('/{suggestion_id}')

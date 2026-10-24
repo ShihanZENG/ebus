@@ -10,6 +10,7 @@ from sqlalchemy import ForeignKey, JSON, String, func, select, update
 from sqlalchemy.orm import Mapped, mapped_column
 
 from . import models as m, schemas as s
+from .common import money as _money
 from .security import record_audit, require, session_db
 
 
@@ -52,10 +53,6 @@ class PurchaseAmendmentDecision(s.Input):
 
 
 router = APIRouter(prefix='/api/v1/purchase-amendments', tags=['SCM 采购变更'])
-
-
-def _money(value) -> str:
-    return str(Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
 
 
 def _order_items(db, po_id: str, *, lock=False):

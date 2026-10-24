@@ -54,7 +54,7 @@ def ask_product(payload: ProductAskInput, db=Depends(session_db), user=Depends(r
     evidence = []
     for _ in range(4):
         try:
-            answer = completion(messages, PRODUCT_TOOLS, 30)
+            answer = completion(messages, PRODUCT_TOOLS, 30, actor_id=user.id, scene='product')
         except RuntimeError as exc:
             raise HTTPException(503, str(exc)[:300]) from None
         calls = answer.get('tool_calls') or []

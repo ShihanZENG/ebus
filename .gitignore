@@ -27,3 +27,15 @@ outputs/
 lab/
 tools/_frontend_calls.json
 tools/_frontend_calls.txt
+
+# 后端自愈守护日志
+supervise.log
+
+.workbuddy-ai/
+
+
+**/.vite-cache*/
+**/dist-verify/
+storefront/.backup-*/
+storefront/.patch-*.cjs
+

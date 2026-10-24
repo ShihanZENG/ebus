@@ -114,6 +114,12 @@ AI 总助手负责识别问题、按账号权限选择工具、调用适当 Agen
 
 ## 与当前项目的对应情况
 
+### BIZ-FR-011 本地只读任务纵切
+
+AI 总助手页面保留即时问答，并增加可追踪任务。`POST /api/v1/assistant/tasks` 接收自然语言目标、可选店铺、SKU 和起止日期；按日期查询时须选定店铺，以该店铺时区解释日期边界。服务端校验账号权限、启用店铺、SKU 与日期顺序，将授权店铺范围写入 LIM Run 快照。`GET /api/v1/assistant/tasks` 和 `GET /api/v1/assistant/tasks/{run_id}` 返回当前用户可访问的状态、结果与失败代码；`POST /api/v1/assistant/tasks/{run_id}/cancel` 可取消等待或查询中的任务。Run ID 与 Trace ID 可回看生命周期；当前只读工具来源名称保存在任务结果中，尚未写入 LIM 工具调用轨迹。
+
+有店铺或日期范围的任务只调用能按该范围过滤的订单查询；指定 SKU 时进一步过滤订单行。查询工具不支持所选范围、或模型未调用任何有效查询工具时，页面提示没有可核对的范围内结果，不把模型文本当作已验证结论。任务由当前服务进程的后台线程执行；进程重启后尚无任务自动恢复。跨 Agent 编排、长期任务队列及其它数据域的时段过滤仍属后续需求。
+
 | 目标能力 | 当前状态 | 代码或页面入口 |
 |---|---|---|
 | ERP 商品、SKU、Listing 本地映射、采购 | 已有本地接口和页面 | `frontend/src/pages/Products.tsx`、`ListingsPage.tsx`、`Purchase.tsx`；`backend/app/listings.py`、`scm.py` |
@@ -140,4 +146,4 @@ AI 总助手负责识别问题、按账号权限选择工具、调用适当 Agen
 
 用户问：“美国站最近有哪些订单待发货、库存够不够？”总助手先识别店铺与时间范围，读取账号有权访问的订单和库存，再按 SKU 与仓库核对可用量，返回待发货订单、缺货项、数据更新时间及对应订单链接。若权限不足或数据不完整，明确指出缺失，不猜测数字。
 
-这个场景可复用当前 OMS、WMS 和店铺权限。只读总助手首版已经提供入口和 API；这个具体的跨订单与库存按 SKU 联合核对场景仍需补齐，再进行真实业务验收。
+这个场景可复用当前 OMS、WMS 和店铺权限。已实现：经营 Agent（`/api/v1/agents/operations/ask`）在 2026-10-22 接入只读证据工具 `get_pending_shipment_inventory_check`，完成「待发货订单（approved / shipping_requested）× 库存按 SKU 联合核对」——自动解析店铺与时间范围（默认最近 30 天、上限 93 天），按库存分配 `inventory_allocation.available` 计算可用量并标注缺货项与缺货汇总，返回结构化结果（含 `kind`、`snapshot_at`、来源、`gaps`、`limitations` 与订单链接）；权限不足或数据缺口时明确说明，不猜测数字。前端 `OperationsAgentPage` 已渲染该证据类型。已通过 pytest 与真实库（erp）验收。

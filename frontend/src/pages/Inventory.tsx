@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Tabs, Tag } from 'antd'
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, message, Tabs, Tag, Alert } from 'antd'
 import api from '../api'
 import { useAuth } from '../auth/AuthProvider'
 import InventoryAllocation from './InventoryAllocation'
+import DataProvenance, { type DataMeta } from '../components/DataProvenance'
 
 interface Balance {
   id: string
@@ -28,7 +29,9 @@ export default function Inventory() {
   const [txns, setTxns] = useState<any[]>([])
   const [whs, setWhs] = useState<Ref[]>([])
   const [skus, setSkus] = useState<Ref[]>([])
+  const [inventoryMeta, setInventoryMeta] = useState<DataMeta | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [inboundOpen, setInboundOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [adjustOldQty, setAdjustOldQty] = useState<number | null>(null)
@@ -42,17 +45,25 @@ export default function Inventory() {
 
   const load = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
-      const [b, t, w, s] = await Promise.all([
+      const [b, t, w, s, summary] = await Promise.all([
         api.get<{ items: Balance[] }>('/inventory', { params: { page_size: 100 } }),
         api.get<{ items: any[] }>('/inventory/transactions', { params: { page_size: 50 } }),
         api.get<{ items: Ref[] }>('/warehouses', { params: { page_size: 100 } }),
         api.get<{ items: Ref[] }>('/skus', { params: { page_size: 100 } }),
+        api.get<{ data_meta: DataMeta }>('/inventory/summary'),
       ])
       setBal(b.data.items)
       setTxns(t.data.items)
       setWhs(w.data.items)
       setSkus(s.data.items)
+      setInventoryMeta(summary.data.data_meta)
+    } catch (error) {
+      setBal([])
+      setTxns([])
+      setInventoryMeta(null)
+      setLoadError(error instanceof Error ? error.message : '库存数据加载失败，请重试')
     } finally {
       setLoading(false)
     }
@@ -146,6 +157,9 @@ export default function Inventory() {
 
   return (
     <>
+    {loadError && <Alert role="alert" type="error" showIcon message="库存数据加载失败" description={loadError} action={<Button size="small" loading={loading} onClick={() => void load()}>重试</Button>} style={{ marginBottom: 16 }} />}
+    {loading && <span role="status" aria-live="polite" className="visually-hidden">正在加载库存数据</span>}
+    <DataProvenance title="库存余额" meta={inventoryMeta} />
     <Tabs items={[
       { key: 'allocation', label: '库存归属与需求', children: <InventoryAllocation warehouses={whs} skus={skus} onChange={() => void load().catch(() => {})} /> },
       {
@@ -215,18 +229,18 @@ export default function Inventory() {
           {() => {
             const { warehouse_id: wid, sku_id: sid, on_hand_qty: qty } = adjustForm.getFieldsValue()
             const oldQty = currentOnHand(wid, sid)
-            if (adjustBalanceLoading) return <div style={{ padding: '4px 0 16px', color: '#8c8c8c' }}>正在读取所选仓库与 SKU 的准确库存…</div>
+            if (adjustBalanceLoading) return <div role="status" aria-live="polite" style={{ padding: '4px 0 16px', color: '#595959' }}>正在读取所选仓库与 SKU 的准确库存…</div>
             if (adjustBalanceError) return <div style={{ padding: '4px 0 16px', color: '#cf1322' }}>{adjustBalanceError}</div>
             if (oldQty === null || qty === undefined || qty === null) return null
             const delta = Number(qty) - oldQty
             return (
               <div style={{ marginBottom: 16, padding: 12, background: '#f0f5ff', borderRadius: 6 }}>
                 系统在库：<b>{oldQty}</b>　盘点后：<b>{qty}</b>　差异：
-                <b style={{ color: delta === 0 ? '#8c8c8c' : delta > 0 ? '#52c41a' : '#f5222d' }}>
+                <b style={{ color: delta === 0 ? '#595959' : delta > 0 ? '#237804' : '#a8071a' }}>
                   {delta > 0 ? `+${delta}` : delta}
                 </b>
                 {adjustOldQty !== null && oldQty !== adjustOldQty && (
-                  <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 4 }}>
+                  <div style={{ color: '#595959', fontSize: 12, marginTop: 4 }}>
                     已切换 SKU/仓库，差异按当前系统库存重新计算
                   </div>
                 )}

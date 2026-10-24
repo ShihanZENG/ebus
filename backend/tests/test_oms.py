@@ -296,3 +296,16 @@ def test_list_orders_filters(setup):
     r = client.get('/api/v1/orders', headers=auth, params={'status': 'draft'})
     assert r.status_code == 200
     assert all(o['status'] == 'draft' for o in r.json()['items'])
+
+
+def test_order_detail_deep_link_respects_shop_scope(setup):
+    client, auth, _ = setup
+    shop, warehouse, skus, currency = demo_basics(client, auth)
+    order = make_order(client, auth, shop, skus[0], currency, source_no='SO-SCOPE-DEEP-LINK').json()
+    role = client.post('/api/v1/roles', headers=auth, json={
+        'code': 'order_deep_link_reader', 'name': '订单深链范围验收', 'permissions': ['orders:read'],
+    }).json()
+    _, limited = create_user(client, auth, role=role['id'], username='orderdeeplinkreader', shop_scope=[])
+
+    response = client.get(f"/api/v1/orders/{order['id']}", headers=limited)
+    assert response.status_code == 404

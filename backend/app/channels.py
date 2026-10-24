@@ -217,15 +217,48 @@ def run_ingest(db, connection, raw_orders, job, adapter):
     job.error_count = errors
     job.status = 'success' if errors == 0 else ('partial' if created else 'failed')
     job.finished_at = m.now()
+    job.detail = {'raw_orders': raw_orders, 'details': details}
+    if errors:
+        _sync_failure_reconcile(db, connection, job, details)
     return details
+
+
+def _sync_failure_reconcile(db, connection, job, details):
+    """同步失败对账：已知本地订单的开渠道同步失败异常（受规则开关控制）。"""
+    from .oms_rules import get_rule
+    from . import models as _m
+    if not get_rule(db, 'auto_exception').get('sync_failure', True):
+        return
+    from .orders_common import get_order_or_404  # noqa: F401  (存在性由下方直接查)
+    from .oms_exceptions import open_exception
+    for entry in details:
+        if entry.get('outcome') != 'error':
+            continue
+        mirror = db.scalar(select(m.ChannelOrderRecord).where(
+            m.ChannelOrderRecord.connection_id == connection.id,
+            m.ChannelOrderRecord.source_order_no == entry.get('source_order_no', '')).limit(1))
+        if mirror is None or mirror.order_id is None:
+            continue
+        order = db.get(_m.SalesOrder, mirror.order_id)
+        if order is None or order.order_status == 'cancelled':
+            continue
+        open_exception(db, order, 'sync_failure',
+                       f'渠道 {connection.channel_code} 同步失败：{entry.get("message", "")[:300]}',
+                       detail={'job_id': job.id, 'source_order_no': entry.get('source_order_no')})
 
 
 def connection_snapshot(obj):
     return {c.name: getattr(obj, c.name) for c in m.ChannelConnection.__table__.columns}
 
 
-def job_snapshot(obj):
-    return {c.name: getattr(obj, c.name) for c in m.ChannelSyncJob.__table__.columns}
+def job_snapshot(obj, detail=False):
+    data = {c.name: getattr(obj, c.name) for c in m.ChannelSyncJob.__table__.columns}
+    payload = obj.detail or {}
+    data['details'] = payload.get('details', []) if detail else []
+    data['has_retry_source'] = bool(payload.get('raw_orders'))
+    if not detail:
+        data.pop('detail', None)
+    return data
 
 
 def record_snapshot(obj):
@@ -434,6 +467,62 @@ def list_sync_jobs(connection_id: str | None = None, status: s.SyncJobStatus | N
                       .order_by(m.ChannelSyncJob.started_at.desc(), m.ChannelSyncJob.id)
                       .offset((page - 1) * page_size).limit(page_size)).all()
     return {'items': [job_snapshot(r) for r in rows], 'total': total, 'page': page, 'page_size': page_size}
+
+
+def _job_with_scope(db, user, job_id):
+    job = db.get(m.ChannelSyncJob, job_id)
+    if job is None:
+        raise HTTPException(404, '同步任务不存在')
+    connection = db.get(m.ChannelConnection, job.connection_id)
+    scope = user.shop_scope
+    if scope is not None and (connection is None or connection.shop_id not in scope):
+        raise HTTPException(404, '同步任务不存在或不在可访问店铺范围内')
+    return job, connection
+
+
+@router.get('/sync-jobs/{job_id}')
+def sync_job_detail(job_id: str, db=Depends(session_db), user=Depends(require('channels:read'))):
+    job, connection = _job_with_scope(db, user, job_id)
+    result = job_snapshot(job, detail=True)
+    result['connection'] = {'id': connection.id, 'shop_id': connection.shop_id,
+                            'channel_code': connection.channel_code} if connection else None
+    return result
+
+
+@router.post('/sync-jobs/{job_id}/retry', status_code=201)
+def retry_sync_job(job_id: str, db=Depends(session_db), user=Depends(require('channels:write'))):
+    """用原任务的失败订单报文新建一次重试任务；成功创建的任务生成新的 job 记录。"""
+    job, connection = _job_with_scope(db, user, job_id)
+    if connection is None:
+        raise HTTPException(422, '原连接已删除，无法重试')
+    payload_orders = (job.detail or {}).get('raw_orders') or []
+    failed_nos = {d.get('source_order_no') for d in (job.detail or {}).get('details', [])
+                  if d.get('outcome') == 'error'}
+    retry_raw = [raw for raw in payload_orders
+                 if str(raw.get('source_order_no') if isinstance(raw, dict) else '') in failed_nos] or \
+                ([raw for raw in payload_orders] if not failed_nos and payload_orders else [])
+    if not retry_raw:
+        raise HTTPException(422, '原任务没有可重试的失败订单报文（可能因执行时未留存原始报文）')
+    if connection.status != 'enabled':
+        raise HTTPException(422, '渠道连接未启用，不能重试')
+    retry_job = m.ChannelSyncJob(connection_id=connection.id, trigger='manual', status='running',
+                                 started_at=m.now(), retry_of_job_id=job.id,
+                                 attempt_no=(job.attempt_no or 1) + 1)
+    db.add(retry_job)
+    db.flush()
+    adapter = adapter_for(connection.channel_code)
+    details = run_ingest(db, connection, retry_raw, retry_job, adapter)
+    connection.last_synced_at = retry_job.finished_at
+    connection.last_error = '' if retry_job.error_count == 0 else f'{retry_job.error_count} 笔订单入库失败'
+    if retry_job.error_count:
+        retry_job.error_message = '；'.join(d['message'] for d in details if d['outcome'] == 'error')[:1000]
+    db.flush()
+    result = job_snapshot(retry_job)
+    result['details'] = details
+    record_audit(db, user, 'channels', retry_job.id, 'sync_retry',
+                 after={'retry_of': job.id, 'result': jsonable_encoder(result)})
+    db.commit()
+    return result
 
 
 @router.get('/orders')

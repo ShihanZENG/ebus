@@ -101,7 +101,7 @@ def create_draft(payload: DraftInput, db=Depends(session_db), user=Depends(requi
         {'role': 'user', 'content': json.dumps(facts, ensure_ascii=False)},
     ]
     try:
-        answer = completion(messages, [], 35)
+        answer = completion(messages, [], 35, actor_id=user.id, scene='listing')
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)[:300]) from None
     try:

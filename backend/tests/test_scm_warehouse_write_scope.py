@@ -20,7 +20,7 @@ def test_scm_writes_are_restricted_to_authorized_warehouses(setup):
 
     role = client.post('/api/v1/roles', headers=auth, json={
         'code': 'scm_write_scoped', 'name': 'SCM scoped writer',
-        'permissions': ['purchase_orders:write', 'replenishment:write'],
+        'permissions': ['purchase_orders:read', 'purchase_orders:write', 'replenishment:write'],
     }).json()
     _, scoped = create_user(client, auth, role=role['id'], username='scopedwriter',
                             warehouse_scope=[visible_wh['id']])
@@ -31,7 +31,7 @@ def test_scm_writes_are_restricted_to_authorized_warehouses(setup):
     }).status_code == 404
     for action, method, payload in [
         ('', 'patch', {'remark': 'unauthorized'}),
-        ('/submit', 'post', None), ('/approve', 'post', None), ('/reject', 'post', None),
+        ('/submit', 'post', None), ('/approve', 'post', None), ('/reject', 'post', {'reason': '范围验收'}),
         ('/cancel', 'post', {'reason': 'unauthorized'}), ('/close', 'post', None),
         ('/receipts', 'post', {'receipt_no': 'UNAUTHORIZED-RCV', 'items': [
             {'po_item_id': foreign_po['items'][0]['id'], 'quantity_accepted': 1, 'quantity_rejected': 0}]}),
@@ -50,6 +50,8 @@ def test_scm_writes_are_restricted_to_authorized_warehouses(setup):
     assert client.post(f"/api/v1/replenishment-suggestions/{foreign_suggestion['id']}/convert",
                        headers=scoped).status_code == 404
 
+    assert client.get(f"/api/v1/purchase-orders/{foreign_po['id']}", headers=scoped).status_code == 404
+    assert client.get(f"/api/v1/purchase-orders/{foreign_po['id']}/receipts", headers=scoped).status_code == 404
     assert client.get(f"/api/v1/purchase-orders/{foreign_po['id']}", headers=auth).json()['status'] == 'submitted'
     assert client.get(f"/api/v1/replenishment-suggestions/{foreign_suggestion['id']}",
                       headers=auth).json()['status'] == 'pending'

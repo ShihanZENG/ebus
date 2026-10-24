@@ -208,7 +208,7 @@ function LegacyPurchaseAgentPage() {
 
   return (
     <div style={{ padding: 16 }}>
-      <Title level={4}>采购 Agent</Title>
+      <Title level={4}>采购供应链 AI</Title>
       <Paragraph type="secondary">
         从库存风险到采购草稿：输入 SKU 与销量/交期参数，Agent 采集证据、确定性计算补货量，生成草稿后由人工审批。
       </Paragraph>

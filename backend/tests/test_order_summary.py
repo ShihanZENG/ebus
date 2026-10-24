@@ -24,6 +24,9 @@ def test_order_summary_not_truncated_and_shop_scoped(setup):
     role = client.post('/api/v1/roles', headers=auth, json={
         'code': 'summary_reader', 'name': '订单统计', 'permissions': ['orders:read']}).json()
     _, restricted = create_user(client, auth, role=role['id'], shop_scope=[])
-    assert client.get('/api/v1/orders/summary', headers=restricted).json() == {
+    restricted_summary = client.get('/api/v1/orders/summary', headers=restricted).json()
+    assert {key: restricted_summary[key] for key in ('total', 'by_status', 'by_currency')} == {
         'total': 0, 'by_status': {}, 'by_currency': []}
+    assert restricted_summary['data_meta']['data_status'] == 'missing'
+    assert restricted_summary['data_meta']['last_record_updated_at'] is None
     assert client.get('/api/v1/orders/summary').status_code == 401
