@@ -76,10 +76,11 @@ def test_empty_scoped_local_summaries_are_marked_missing(setup):
 def test_datalab_metadata_separates_query_from_upstream_freshness(setup, monkeypatch):
     client, auth, _ = setup
 
-    async def source_rows(path, params=None):
+    async def source_rows(method, path, *, params=None, json=None):
         return {'rows': [{'business_date': '2026-10-20', 'amount': 12.5}]}
 
-    monkeypatch.setattr(datalab, '_datalab_get', source_rows)
+    monkeypatch.setattr(datalab, '_request_json', source_rows)
+    datalab._cache.clear()
     response = client.get('/api/v1/datalab/table/dws_finance_day', headers=auth)
     assert response.status_code == 200, response.text
     data = response.json()
@@ -93,24 +94,27 @@ def test_datalab_metadata_separates_query_from_upstream_freshness(setup, monkeyp
     assert datetime.fromisoformat(meta['queried_at'].replace('Z', '+00:00'))
     assert meta['sample_status'] == 'unclassified'
 
-    async def empty_rows(path, params=None):
+    async def empty_rows(method, path, *, params=None, json=None):
         return {'rows': []}
 
-    monkeypatch.setattr(datalab, '_datalab_get', empty_rows)
+    monkeypatch.setattr(datalab, '_request_json', empty_rows)
+    datalab._cache.clear()
     empty = client.get('/api/v1/datalab/table/dws_finance_day', headers=auth).json()
     assert empty['data_meta']['data_status'] == 'missing'
     assert empty['data_meta']['upstream_updated_at'] is None
 
-    monkeypatch.setattr(datalab, '_datalab_get', source_rows)
+    monkeypatch.setattr(datalab, '_request_json', source_rows)
+    datalab._cache.clear()
     overview = client.get('/api/v1/datalab/overview', headers=auth).json()
     for section in ('sales_daily', 'inventory_health', 'purchase_open', 'replenishment', 'data_quality'):
         assert overview[section]['data_meta']['source_mode'] == 'warehouse_snapshot'
         assert overview[section]['data_meta']['upstream_updated_at'] is None
 
-    async def source_unavailable(path, params=None):
+    async def source_unavailable(method, path, *, params=None, json=None):
         raise RuntimeError('upstream unavailable')
 
-    monkeypatch.setattr(datalab, '_datalab_get', source_unavailable)
+    monkeypatch.setattr(datalab, '_request_json', source_unavailable)
+    datalab._cache.clear()
     unavailable = client.get('/api/v1/datalab/overview', headers=auth).json()
     assert unavailable['sales_daily']['data_meta']['data_status'] == 'unavailable'
 

@@ -26,7 +26,7 @@ def test_natural_language_task_is_tracked_with_valid_business_scope(setup, monke
     client, auth, _ = setup
     shop, _, skus, _ = demo_basics(client, auth)
 
-    def unsupported_completion(messages, *_):
+    def unsupported_completion(messages, *_, **kwargs):
         if not any(item['role'] == 'tool' for item in messages):
             return {'content': '', 'tool_calls': [{
                 'id': 'unsupported-snapshot', 'type': 'function',
@@ -71,7 +71,7 @@ def test_task_rejects_unavailable_scope_sku_and_bad_dates(setup, monkeypatch):
     _, scoped = create_user(client, auth, role=role, username='task_scoped_user', shop_scope=[])
     valid = {'goal': '查看 SKU', 'shop_id': shop['id'], 'sku_code': skus[0]['code'],
              'date_from': '2026-10-01', 'date_to': '2026-10-21'}
-    monkeypatch.setattr(assistant, 'completion', lambda *_: {'content': '无模型调用'})
+    monkeypatch.setattr(assistant, 'completion', lambda *_, **kwargs: {'content': '无模型调用'})
 
     assert client.post('/api/v1/assistant/tasks', headers=scoped, json=valid).status_code == 404
     assert client.post('/api/v1/assistant/tasks', headers=auth,
@@ -92,7 +92,7 @@ def test_task_cancel_drops_late_model_result_and_hides_other_user_run(setup, mon
     shop, _, skus, _ = demo_basics(client, auth)
     started, release = Event(), Event()
 
-    def slow_completion(*_):
+    def slow_completion(*_, **kwargs):
         started.set()
         assert release.wait(5)
         return {'content': '迟到的模型结果'}
@@ -128,7 +128,7 @@ def test_task_cancel_drops_late_model_result_and_hides_other_user_run(setup, mon
 def test_task_failure_has_visible_status_without_leaking_model_error(setup, monkeypatch):
     client, auth, _ = setup
     monkeypatch.setattr(assistant, 'completion',
-                        lambda *_: (_ for _ in ()).throw(RuntimeError('sk-private-secret model failure')))
+                        lambda *_, **kwargs: (_ for _ in ()).throw(RuntimeError('sk-private-secret model failure')))
     created = client.post('/api/v1/assistant/tasks', headers=auth, json={'goal': '查询经营情况'})
     assert created.status_code == 201, created.text
     task = wait_for_task(client, auth, created.json()['run_id'], 'FAILED')
@@ -158,7 +158,7 @@ def test_task_order_tool_is_narrowed_to_requested_shop_sku_and_dates(setup, monk
 
     observed = []
 
-    def completion(messages, *_):
+    def completion(messages, *_, **kwargs):
         tool_messages = [item for item in messages if item['role'] == 'tool']
         if not tool_messages:
             return {'content': '', 'tool_calls': [{

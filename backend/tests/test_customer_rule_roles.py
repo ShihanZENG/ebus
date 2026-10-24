@@ -47,7 +47,7 @@ def test_customer_generation_filters_rules_by_requester_role(setup, monkeypatch)
 
     captured = {}
 
-    def fake_completion(messages, tools, timeout):
+    def fake_completion(messages, tools, timeout, **kwargs):
         captured['prompt'] = messages[-1]['content']
         return {'content': '{"draft":"已记录尺码问题，请人工核对。","citations":["RULE-CS"]}'}
 

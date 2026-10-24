@@ -70,7 +70,7 @@ def test_purchase_role_cannot_generate_or_read_finance_records(setup, monkeypatc
     }).json()
     _, purchase_auth = create_user(
         client, admin_auth, role=role['id'], shop_scope=[shop['id']], warehouse_scope=[])
-    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout: {
+    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout, **kwargs: {
         'content': '基于所列数据的待审核说明。',
     })
 
@@ -105,7 +105,7 @@ def test_finance_role_can_generate_and_read_finance_but_not_ads(setup, monkeypat
     }).json()
     _, finance_auth = create_user(
         client, admin_auth, role=role['id'], shop_scope=[shop['id']], warehouse_scope=[])
-    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout: {
+    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout, **kwargs: {
         'content': '基于所列数据的待审核说明。',
     })
 

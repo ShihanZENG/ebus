@@ -30,6 +30,8 @@ def test_demo_seed_rerun_preserves_stock_and_price(setup):
     _, _, engine = setup
     with sessions(engine)() as db:
         seed_catalogue(db)
+        before_products = db.scalar(select(func.count()).select_from(sm.Product))
+        before_variants = db.scalar(select(func.count()).select_from(sm.Variant))
         variant = db.scalar(select(sm.Variant))
         variant.price = 42
         balance = db.scalar(select(m.InventoryBalance).where(m.InventoryBalance.sku_id == variant.sku_id))
@@ -40,5 +42,5 @@ def test_demo_seed_rerun_preserves_stock_and_price(setup):
         db.refresh(balance)
         assert float(variant.price) == 42
         assert balance.on_hand_qty == 1
-        assert db.scalar(select(func.count()).select_from(sm.Product)) == 1
-        assert db.scalar(select(func.count()).select_from(sm.Variant)) == 6
+        assert db.scalar(select(func.count()).select_from(sm.Product)) == before_products
+        assert db.scalar(select(func.count()).select_from(sm.Variant)) == before_variants
