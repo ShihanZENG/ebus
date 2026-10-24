@@ -45,7 +45,8 @@ def test_eval_comparison_migration_round_trips_in_isolated_sqlite(tmp_path, monk
         assert 'lim_eval_comparisons' not in inspect(engine).get_table_names()
         command.upgrade(config, 'head')
         assert 'lim_eval_comparisons' in inspect(engine).get_table_names()
+        scripts = ScriptDirectory.from_config(config)
         with engine.connect() as connection:
-            assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == '0037'
+            assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == scripts.get_current_head()
     finally:
         engine.dispose()
