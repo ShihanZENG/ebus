@@ -3,12 +3,19 @@
 .ai-system-brand { display: flex; gap: 11px; align-items: center; padding: 23px 18px; min-height: 91px; }
 .ai-system-brand > button { background: #7666bd; border: 0; color: white; border-radius: 9px; width: 31px; height: 34px; flex: 0 0 31px; cursor: pointer; font-size: 18px; }
 .ai-system-brand strong { display: block; color: #3d425f; font-size: 17px; letter-spacing: -.5px; }.ai-system-brand small { display: block; color: #9592a8; font-size: 10px; margin-top: 4px; }
-.ai-system-sidebar nav { padding: 8px 12px; }.ai-system-nav-group { color: #a4a4b7; font-size: 10px; margin: 23px 13px 9px; letter-spacing: 1px; }
-.ai-system-nav-item { display: flex; align-items: center; width: 100%; gap: 11px; border: 0; border-radius: 7px; background: transparent; color: #7b7e94; padding: 12px 10px; margin: 2px 0; font: inherit; font-size: 12px; text-align: left; cursor: pointer; white-space: nowrap; }
+.ai-system-sidebar nav { padding: 8px 12px; }
+.ai-system-nav-block { margin: 4px 0; }
+.ai-system-nav-group { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 7px; background: transparent; color: #5d5f77; padding: 10px 10px; margin: 10px 0 2px; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; white-space: nowrap; }
+.ai-system-nav-group:hover { background: #f1eef8; }.ai-system-nav-group.active { color: #7462bb; }
+.ai-system-nav-group .ai-system-nav-caret { margin-left: auto; font-size: 10px; color: #a4a4b7; }
+.ai-system-nav-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: 0 0 18px; color: #8a86a3; font-size: 14px; }
+.ai-system-nav-group.active .ai-system-nav-icon, .ai-system-nav-item.active .ai-system-nav-icon { color: #7462bb; }
+.ai-system-nav-item { display: flex; align-items: center; width: 100%; gap: 10px; border: 0; border-radius: 7px; background: transparent; color: #7b7e94; padding: 9px 10px; margin: 2px 0; font: inherit; font-size: 12px; text-align: left; cursor: pointer; white-space: nowrap; }
+.ai-system-nav-block .ai-system-nav-item { padding-left: 20px; }
 .ai-system-nav-item.active { background: #eeebfa; color: #7462bb; font-weight: 600; }.ai-system-nav-item:hover:not(:disabled) { background: #f1eef8; }.ai-system-nav-item:disabled { color: #a5a5b5; cursor: default; }
-.ai-system-nav-number { font-size: 10px; font-variant-numeric: tabular-nums; color: #a7a3b8; }.ai-system-nav-item.active .ai-system-nav-number { color: #9381cb; }.ai-system-nav-item small { margin-left: auto; font-size: 8px; border: 1px solid #e6e4ed; border-radius: 3px; padding: 1px 3px; color: #a8a5b5; }
+.ai-system-nav-item small { margin-left: auto; font-size: 8px; border: 1px solid #e6e4ed; border-radius: 3px; padding: 1px 3px; color: #a8a5b5; }
 .ai-system-workspace { display: flex; align-items: center; gap: 10px; background: transparent; border: 0; border-top: 1px solid #ededf4; margin: 22px 15px 0; padding: 17px 8px; color: #89899f; cursor: pointer; font-size: 12px; }
-.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-brand { padding: 23px 16px; }.ai-system-sidebar.ant-layout-sider-collapsed nav { padding: 8px; }.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-nav-item { justify-content: center; padding: 13px 4px; }.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-nav-number { font-size: 12px; }
+.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-brand { padding: 23px 16px; }.ai-system-sidebar.ant-layout-sider-collapsed nav { padding: 8px; }.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-nav-group { justify-content: center; padding: 12px 4px; }.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-nav-item { justify-content: center; padding: 13px 4px; }.ai-system-sidebar.ant-layout-sider-collapsed .ai-system-nav-icon { width: 20px; flex-basis: 20px; font-size: 15px; }
 .ai-system-topbar { background: white !important; border-bottom: 1px solid #e7e8f0; height: 51px !important; }
 .ai-system-topbar .ant-tabs-nav::before { border-bottom: 0 !important; }.ai-system-topbar .ant-tabs-tab { border: 0 !important; background: transparent !important; font-size: 12px; }.ai-system-topbar .ant-tabs-tab-active .ant-tabs-tab-btn { color: #8472bb !important; text-shadow: none; }.ai-system-topbar .ant-btn, .ai-system-topbar .ant-btn span, .ai-system-topbar a { color: #8a859f !important; }.ai-system-topbar .ant-avatar { background: #c8beda !important; }.ai-system-topbar .ant-avatar span { color: white !important; }
 .ai-system-shell #main-content { background: #f5f6fa !important; padding: 22px !important; }

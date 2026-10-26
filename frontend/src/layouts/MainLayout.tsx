@@ -15,21 +15,27 @@ import {
   AppstoreOutlined,
   AmazonOutlined,
   BarChartOutlined,
+  CheckCircleOutlined,
   CustomerServiceOutlined,
   DatabaseOutlined,
   DollarOutlined,
+  ExperimentOutlined,
   HomeOutlined,
   InboxOutlined,
+  LineChartOutlined,
   LogoutOutlined,
   ToolOutlined,
   SettingOutlined,
+  SendOutlined,
   ShopOutlined,
   ShoppingOutlined,
   SoundOutlined,
+  ThunderboltOutlined,
   UserOutlined,
   RobotOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
-import { findSystemNavigation, NAV_PERMISSION, findNavPath, SYSTEM_NAV, type NavNode } from '../config/menu'
+import { findSystemNavigation, NAV_PERMISSION, findNavPath, SYSTEM_NAV, resolveNavState, type NavNode } from '../config/menu'
 import { useAuth } from '../auth/AuthProvider'
 import './aiShell.css'
 
@@ -39,8 +45,6 @@ const ICONS: Record<string, JSX.Element> = {
   dashboard: <HomeOutlined />,
   'ai-assistant': <RobotOutlined />,
   'ai-dashboard': <BarChartOutlined />,
-  'g-ai-business': <RobotOutlined />,
-  'g-ai-execution': <ToolOutlined />,
   'ai-task-history': <BarChartOutlined />,
   'lim-console': <ToolOutlined />,
   'lim-model-gateway': <SettingOutlined />,
@@ -72,6 +76,33 @@ const ICONS: Record<string, JSX.Element> = {
 const SIDEBAR_BG = '#2d2d44'
 const SIDEBAR_WIDTH = 80
 
+/** AI 智能经营系统侧栏图标（分组 key 与叶子 key 均在此取图标）。 */
+const AI_ICONS: Record<string, JSX.Element> = {
+  'ai-dashboard': <BarChartOutlined />,
+  'ai-copilot': <RobotOutlined />,
+  'g-ai-risk-task': <WarningOutlined />,
+  'ai-risk-center': <WarningOutlined />,
+  'ai-task-history': <BarChartOutlined />,
+  'ai-agent-workbench': <RobotOutlined />,
+  'g-ai-strategy': <ExperimentOutlined />,
+  'ai-strategy-center': <ExperimentOutlined />,
+  'ai-strategy-templates': <ExperimentOutlined />,
+  'g-ai-approval-execution': <CheckCircleOutlined />,
+  'ai-approval-center': <CheckCircleOutlined />,
+  'ai-execution-center': <SendOutlined />,
+  'g-ai-effect': <LineChartOutlined />,
+  'ai-effect-overview': <LineChartOutlined />,
+  'g-ai-capability': <ThunderboltOutlined />,
+  'ai-capability': <ThunderboltOutlined />,
+  'product-agent': <AppstoreOutlined />,
+  'operations-agent': <ShoppingOutlined />,
+  'lim-replenishment': <InboxOutlined />,
+  'purchase-agent': <ShopOutlined />,
+  'ad-growth': <SoundOutlined />,
+  'profit-finance': <DollarOutlined />,
+  'customer-agent': <CustomerServiceOutlined />,
+}
+
 const API_DOCS_URL = 'http://127.0.0.1:18080/docs'
 
 export default function MainLayout() {
@@ -81,9 +112,16 @@ export default function MainLayout() {
 
   const currentKey = location.pathname.replace(/^\//, '') || 'dashboard'
   const currentSystem = findSystemNavigation(location.pathname)
-  const [openTabs, setOpenTabs] = useState<string[]>([currentKey])
+  // 详情路由（带 :id 或子路径）归属到所属分组/叶子，用于侧栏高亮与页签标签
+  const navState = useMemo(
+    () => resolveNavState(location.pathname, currentSystem.id),
+    [location.pathname, currentSystem.id],
+  )
+  const activeKey = navState.leaf ?? currentKey
+  const [openTabs, setOpenTabs] = useState<string[]>([activeKey])
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null)
   const [aiNavCollapsed, setAiNavCollapsed] = useState(false)
+  const [expandedAiGroups, setExpandedAiGroups] = useState<Set<string>>(new Set())
   const isAi = currentSystem.id === 'ai'
 
   const canOpen = (key: string) => {
@@ -119,14 +157,40 @@ export default function MainLayout() {
   }
   const currentGroup = useMemo(() => {
     if (currentKey === 'dashboard') return null
-    return findGroupKey(visibleNav, currentKey)
-  }, [currentKey, visibleNav])
+    return navState.group ?? findGroupKey(visibleNav, currentKey)
+  }, [currentKey, navState, visibleNav])
+
+  // AI 侧栏：当前所在分组自动展开，切换页面时保持打开
+  useEffect(() => {
+    if (isAi && currentGroup) {
+      setExpandedAiGroups((prev) => {
+        if (prev.has(currentGroup)) return prev
+        const next = new Set(prev)
+        next.add(currentGroup)
+        return next
+      })
+    }
+  }, [isAi, currentGroup])
+
+  const toggleAiGroup = (key: string, node: NavNode) => {
+    setExpandedAiGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+    // 展开分组且当前不在该组内时，跳转到组内第一个可访问页面
+    if (!expandedAiGroups.has(key) && currentGroup !== key) {
+      const firstLeaf = findFirstLeaf(node)
+      if (firstLeaf) navigate(`/${firstLeaf}`)
+    }
+  }
 
   useEffect(() => {
-    if (canOpen(currentKey)) {
-      setOpenTabs((tabs) => tabs.includes(currentKey) ? tabs : [...tabs, currentKey])
+    if (canOpen(activeKey)) {
+      setOpenTabs((tabs) => tabs.includes(activeKey) ? tabs : [...tabs, activeKey])
     }
-  }, [currentKey, user])
+  }, [activeKey, user])
 
   const tabItems = openTabs.map((key) => ({
     key,
@@ -137,7 +201,7 @@ export default function MainLayout() {
   const closeTab = (target: string) => {
     const next = openTabs.filter((key) => key !== target)
     setOpenTabs(next.length ? next : [currentSystem.homePage])
-    if (currentKey === target) navigate(`/${next.at(-1) ?? currentSystem.homePage}`)
+    if (activeKey === target) navigate(`/${next.at(-1) ?? currentSystem.homePage}`)
   }
 
   const findFirstLeaf = (node: NavNode): string | null => {
@@ -223,10 +287,50 @@ export default function MainLayout() {
       {/* Left dark narrow sidebar - Lingxing style */}
       {isAi ? <Sider width={224} collapsedWidth={64} collapsed={aiNavCollapsed} breakpoint="lg" onBreakpoint={setAiNavCollapsed} trigger={null} className="ai-system-sidebar" theme="light">
         <div className="ai-system-brand"><button aria-label={aiNavCollapsed ? '展开 AI 系统导航' : '收起 AI 系统导航'} onClick={() => setAiNavCollapsed((value) => !value)}><RobotOutlined /></button>{!aiNavCollapsed && <span><strong>CommerceOS</strong><small>AI 智能经营系统</small></span>}</div>
-        <nav aria-label="AI 系统导航">{visibleNav.map((node) => <div key={node.key}>
-          {node.children && !aiNavCollapsed && <div className="ai-system-nav-group">{node.label}</div>}
-          {(node.children ? flattenLeaves(node.children) : [node]).map((leaf) => <Tooltip key={leaf.key} title={aiNavCollapsed ? leaf.label : undefined} placement="right"><button className={`ai-system-nav-item ${currentKey === leaf.key ? 'active' : ''}`} disabled={leaf.disabled} aria-label={leaf.label} aria-current={currentKey === leaf.key ? 'page' : undefined} onClick={() => { navigate(`/${leaf.key}`); if (window.matchMedia('(max-width: 991px)').matches) setAiNavCollapsed(true) }}><span className="ai-system-nav-number">{leaf.label.slice(0, 2)}</span>{!aiNavCollapsed && <span>{leaf.label.replace(/^\d+\s*/, '').replace('（规划中）', '')}</span>}{leaf.disabled && !aiNavCollapsed && <small>规划</small>}</button></Tooltip>)}
-        </div>)}</nav>
+        <nav aria-label="AI 系统导航">{visibleNav.map((node) => node.children ? (
+          <div key={node.key} className="ai-system-nav-block">
+            <button
+              type="button"
+              className={`ai-system-nav-group ${currentGroup === node.key ? 'active' : ''}`}
+              aria-expanded={expandedAiGroups.has(node.key)}
+              aria-label={node.label}
+              onClick={() => toggleAiGroup(node.key, node)}
+            >
+              <span className="ai-system-nav-icon">{AI_ICONS[node.key]}</span>
+              {!aiNavCollapsed && <span className="ai-system-nav-group-label">{node.label}</span>}
+              {!aiNavCollapsed && <span className="ai-system-nav-caret" aria-hidden="true">{expandedAiGroups.has(node.key) ? '▾' : '▸'}</span>}
+            </button>
+            {!aiNavCollapsed && (expandedAiGroups.has(node.key)) && node.children.map((leaf) => (
+              <Tooltip key={leaf.key} title={aiNavCollapsed ? leaf.label : undefined} placement="right">
+                <button
+                  type="button"
+                  className={`ai-system-nav-item ${activeKey === leaf.key ? 'active' : ''}`}
+                  disabled={leaf.disabled}
+                  aria-label={leaf.label}
+                  aria-current={currentKey === leaf.key ? 'page' : undefined}
+                  onClick={() => { navigate(`/${leaf.key}`); if (window.matchMedia('(max-width: 991px)').matches) setAiNavCollapsed(true) }}
+                >
+                  <span className="ai-system-nav-icon">{AI_ICONS[leaf.key] ?? AI_ICONS[node.key]}</span>
+                  <span className="ai-system-nav-label">{leaf.label}{leaf.disabled && <small>规划</small>}</span>
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+        ) : (
+          <Tooltip key={node.key} title={aiNavCollapsed ? node.label : undefined} placement="right">
+            <button
+              type="button"
+              className={`ai-system-nav-item ${activeKey === node.key ? 'active' : ''}`}
+              disabled={node.disabled}
+              aria-label={node.label}
+              aria-current={currentKey === node.key ? 'page' : undefined}
+              onClick={() => { navigate(`/${node.key}`); if (window.matchMedia('(max-width: 991px)').matches) setAiNavCollapsed(true) }}
+            >
+              <span className="ai-system-nav-icon">{AI_ICONS[node.key]}</span>
+              {!aiNavCollapsed && <span className="ai-system-nav-label">{node.label}{node.disabled && <small>规划</small>}</span>}
+            </button>
+          </Tooltip>
+        ))}</nav>
         <button className="ai-system-workspace" aria-label="返回系统工作区" onClick={() => navigate('/workspace')}><AppstoreOutlined />{!aiNavCollapsed && '系统工作区'}</button>
       </Sider> : <Sider
         width={SIDEBAR_WIDTH}

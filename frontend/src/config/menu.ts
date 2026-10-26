@@ -127,70 +127,58 @@ const ERP_NAV: NavNode[] = [
   },
 ]
 
+/**
+ * AI 智能经营系统导航（2026-10-24 按「17→7 导航精简方案」收敛）。
+ * 旧入口 → 新入口映射（需求编号全部保留，仅菜单去编号）：
+ *   ai-dashboard(PG-001) → 经营驾驶舱；ai-copilot(PG-002) → AI Copilot
+ *   g-ai-risk(PG-004/005/006) + 经营任务历史(PG-019) + Agent 任务追踪(PG-007/008 业务侧) → 风险与任务中心
+ *   g-ai-strategy(PG-009/010) + g-ai-sim(PG-011/012) + 策略模板(PG-020) → 策略决策中心（组 key g-ai-strategy）
+ *   g-ai-approval(PG-013/014) + g-ai-execution(PG-015/016) → 审批与执行中心
+ *     （ai-approval-center 策略审批；ai-execution-center 策略执行与监控，执行状态/异常/记录/审计保留）
+ *   g-ai-effect(PG-017/018) → 效果复盘中心
+ *   g-ai-capability 7 个业务场景 → 业务智能应用
+ *   g-ai-agent 技术编排（Prompt 配置/工具注册/模型调用追踪）→ LIM 智能中间层
+ */
 const AI_NAV: NavNode[] = [
-  { key: 'ai-dashboard', label: 'AI-PG-001 智能经营总览' },
-  { key: 'ai-copilot', label: 'AI-PG-002 AI 经营 Copilot' },
+  { key: 'ai-dashboard', label: '经营驾驶舱' },
+  { key: 'ai-copilot', label: 'AI Copilot' },
   {
-    key: 'g-ai-risk',
-    label: 'AI-M03 智能风险中心',
+    key: 'g-ai-risk-task',
+    label: '风险与任务中心',
     children: [
-      { key: 'ai-risk-center', label: 'AI-PG-004/005/006 风险事件与规则' },
-    ],
-  },
-  {
-    key: 'g-ai-agent',
-    label: 'AI-M04 经营 Agent 协作',
-    children: [
-      { key: 'ai-agent-workbench', label: 'AI-PG-007/008 Agent 工作台与协作' },
+      { key: 'ai-risk-center', label: '风险事件与规则' },
+      { key: 'ai-task-history', label: '经营任务历史' },
+      { key: 'ai-agent-workbench', label: 'Agent 任务追踪' },
     ],
   },
   {
     key: 'g-ai-strategy',
-    label: 'AI-M05 策略生成中心',
+    label: '策略决策中心',
     children: [
-      { key: 'ai-strategy-center', label: 'AI-PG-009/010 策略任务与生成' },
+      { key: 'ai-strategy-center', label: '策略工作台（任务/生成/仿真/方案对比）' },
+      { key: 'ai-strategy-templates', label: '策略模板' },
     ],
   },
   {
-    key: 'g-ai-sim',
-    label: 'AI-M06 策略仿真中心',
+    key: 'g-ai-approval-execution',
+    label: '审批与执行中心',
     children: [
-      { key: 'ai-strategy-center', label: 'AI-PG-011/012 仿真与方案对比' },
-    ],
-  },
-  {
-    key: 'g-ai-approval',
-    label: 'AI-M07 策略审批中心',
-    children: [
-      { key: 'ai-approval-center', label: 'AI-PG-013/014 策略审批' },
-    ],
-  },
-  {
-    key: 'g-ai-execution',
-    label: 'AI-M08 策略执行中心',
-    children: [
-      { key: 'ai-strategy-center', label: 'AI-PG-015/016 策略执行' },
+      { key: 'ai-approval-center', label: '策略审批' },
+      { key: 'ai-execution-center', label: '策略执行与监控' },
     ],
   },
   {
     key: 'g-ai-effect',
-    label: 'AI-M09 效果评估中心',
+    label: '效果复盘中心',
     children: [
-      { key: 'ai-effect-overview', label: 'AI-PG-017/018 效果评估' },
-    ],
-  },
-  {
-    key: 'g-ai-history',
-    label: 'AI-M10 经营任务与策略历史',
-    children: [
-      { key: 'ai-task-history', label: 'AI-PG-019 经营任务历史' },
-      { key: 'ai-strategy-templates', label: 'AI-PG-020 经营策略模板' },
+      { key: 'ai-effect-overview', label: '效果评估与复盘' },
     ],
   },
   {
     key: 'g-ai-capability',
-    label: '业务场景 AI（能力底座）',
+    label: '业务智能应用',
     children: [
+      { key: 'ai-capability', label: '应用中心' },
       { key: 'product-agent', label: '商品与 Listing AI' },
       { key: 'operations-agent', label: '销售订单 AI' },
       { key: 'lim-replenishment', label: '库存补货 AI' },
@@ -243,7 +231,7 @@ export const SYSTEM_NAV: SystemNavigation[] = [
 
 const SYSTEM_ONLY_ROUTES: Record<SystemNavigation['id'], Set<string>> = {
   erp: new Set(),
-  ai: new Set(['ai-dashboard', 'ai-copilot', 'ai-copilot-analysis', 'ai-risk-center', 'ai-strategy-center', 'ai-approval-center', 'ai-agent-workbench', 'ai-agent-collab', 'ai-effect-overview', 'ai-effect', 'ai-task-history', 'ai-strategy-templates', 'product-agent', 'operations-agent', 'lim-replenishment', 'purchase-agent', 'ad-growth', 'profit-finance', 'customer-agent']),
+  ai: new Set(['ai/tasks', 'ai-dashboard', 'ai-copilot', 'ai-copilot-analysis', 'ai-risk-center', 'ai-strategy-center', 'ai-approval-center', 'ai-execution-center', 'ai-agent-workbench', 'ai-agent-collab', 'ai-effect-overview', 'ai-effect', 'ai-task-history', 'ai-strategy-templates', 'ai-capability', 'product-agent', 'operations-agent', 'lim-replenishment', 'purchase-agent', 'ad-growth', 'profit-finance', 'customer-agent']),
   lim: new Set(['lim-console', 'lim-agent-runtime', 'lim-tool-registry', 'lim-workflow', 'lim-runs', 'lim-alerts', 'lim-eval', 'lim-knowledge', 'lim-skills', 'lim-model-gateway']),
   storefront: new Set(['storefront']),
 }
@@ -253,6 +241,41 @@ export function findSystemNavigation(path: string): SystemNavigation {
   return SYSTEM_NAV.find((system) =>
     [...SYSTEM_ONLY_ROUTES[system.id]].some((key) => route === key || route.startsWith(key + '/')),
   ) ?? SYSTEM_NAV[0]
+}
+
+/** 详情路由（带 :id 或子路径）到其所属分组 + 代表性叶子的映射，用于侧栏分组高亮与页签标签。 */
+export const DETAIL_ROUTE_GROUP: Record<string, { group: string; leaf: string | null }> = {
+  'ai-agent-collab': { group: 'g-ai-risk-task', leaf: 'ai-agent-workbench' },
+  'ai-effect': { group: 'g-ai-effect', leaf: 'ai-effect-overview' },
+}
+
+/**
+ * 计算某路径在所属系统导航中的「叶子 + 分组」状态，兼容详情路由。
+ * - 返回 group = 离该路由最近的祖先分组 key（用于侧栏分组高亮）。
+ * - 返回 leaf = 精确匹配的叶子 key；详情路由经映射后可能回指某个真实叶子（如 ai-copilot-analysis → ai-copilot、ai/tasks → ai-strategy-center）。
+ */
+export function resolveNavState(pathname: string, systemId: string): { leaf: string | null; group: string | null } {
+  const route = pathname.replace(/^\/+|\/+$/g, '')
+  if (!route) return { leaf: null, group: null }
+  const head = route.split('/')[0]
+  if (systemId === 'ai') {
+    if (route.startsWith('ai/tasks')) return { leaf: 'ai-strategy-center', group: 'g-ai-strategy' }
+    if (head === 'ai-copilot-analysis') return { leaf: 'ai-copilot', group: null }
+    if (DETAIL_ROUTE_GROUP[head]) return { leaf: DETAIL_ROUTE_GROUP[head].leaf, group: DETAIL_ROUTE_GROUP[head].group }
+  }
+  const sys = SYSTEM_NAV.find((s) => s.id === systemId)
+  if (!sys) return { leaf: null, group: null }
+  const walk = (nodes: NavNode[], ancestor: string | null): { leaf: string | null; group: string | null } => {
+    for (const n of nodes) {
+      if (n.key === route) return { leaf: n.key, group: ancestor }
+      if (n.children) {
+        const r = walk(n.children, n.key)
+        if (r.leaf || r.group) return r
+      }
+    }
+    return { leaf: null, group: null }
+  }
+  return walk(sys.nav, null)
 }
 
 /** Backward-compatible ERP navigation for permission and API metadata consumers. */
@@ -285,6 +308,7 @@ export const NAV_PERMISSION: Record<string, string> = {
   'ai-risk-center': 'purchase_agent:read',
   'ai-strategy-center': 'purchase_agent:read',
   'ai-approval-center': 'purchase_agent:read',
+  'ai-execution-center': 'purchase_agent:read',
   'ai-copilot': 'assistant:read',
   'ai-copilot-analysis': 'assistant:read',
   'ai-agent-workbench': 'assistant:read',
@@ -292,6 +316,7 @@ export const NAV_PERMISSION: Record<string, string> = {
   'ai-effect-overview': 'assistant:read',
   'ai-effect': 'assistant:read',
   'ai-strategy-templates': 'assistant:read',
+  'ai-capability': 'assistant:read',
   'ai-dashboard': 'dashboard:read',
   'ai-assistant': 'assistant:read',
   'ai-task-history': 'assistant:read',
@@ -404,9 +429,11 @@ export const MODULE_API: Record<string, string> = {
   'ai-risk-center': 'GET /api/v1/decision-center/risks + /tasks（真实后端）',
   'ai-strategy-center': 'GET /api/v1/decision-center/tasks + 仿真版本（真实后端）',
   'ai-approval-center': 'POST /api/v1/decision-center/tasks/{id}/submit|approve|reject（真实后端）',
+  'ai-execution-center': 'POST /api/v1/decision-center/tasks/{id}/execute|confirm + 任务/执行记录（真实后端）',
   'ai-agent-workbench': '前端构造演示数据（设计演示·虚构样例）',
   'ai-agent-collab': '前端构造演示数据（设计演示·虚构样例）',
   'ai-effect-overview': '前端构造演示数据（设计演示·虚构样例）',
   'ai-effect': '前端构造演示数据（设计演示·虚构样例）',
   'ai-strategy-templates': '前端构造演示数据（设计演示·虚构样例）',
+  'ai-capability': '枢纽页：跳转 7 个业务场景 AI（各自真实接口）',
 }

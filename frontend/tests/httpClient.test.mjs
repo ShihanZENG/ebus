@@ -13,14 +13,18 @@ test('JSON and download clients preserve query, body, errors and session expiry 
   const server = createServer(async (req, res) => {
     let body = ''
     for await (const chunk of req) body += chunk
-    const path = req.url.split('?')[0]
+    // axios 的 Node 适配器在带 params 时会发送 absolute-form 请求行（RFC 7230 §5.3.2），
+    // 这里统一归一化成 path + query 再做路由匹配。
+    const parsed = new URL(req.url, 'http://localhost')
+    const path = parsed.pathname
+    const search = parsed.search
     if (path === '/unauthorized') { res.writeHead(401); res.end('{}'); return }
     if (path === '/empty') { res.writeHead(204); res.end(); return }
     if (path === '/invalid') { res.writeHead(422, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: '输入无效' } })); return }
     if (path === '/download') { res.end('download contents'); return }
     if (path === '/plain') { res.end('plain response'); return }
     res.setHeader('Content-Type', 'application/json')
-    res.end(JSON.stringify({ url: req.url, token: req.headers.authorization, body, contentType: req.headers['content-type'] }))
+    res.end(JSON.stringify({ url: path + search, token: req.headers.authorization, body, contentType: req.headers['content-type'] }))
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const originalBase = http.defaults.baseURL

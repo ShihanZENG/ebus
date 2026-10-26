@@ -20,7 +20,7 @@ export default function AiOpsStrategyTemplatesPage() {
     { title: '说明', dataIndex: 'description', ellipsis: true },
     { title: '默认参数', dataIndex: 'params', render: (p: StrategyTemplate['params']) => <Space wrap>{p.map((x) => <Tag key={x.key}>{x.key}: {x.value}</Tag>)}</Space> },
     { title: '使用次数', dataIndex: 'usageCount', render: (n: number) => `${n} 次` },
-    { title: '操作', render: (_, _r) => <Button type="link" onClick={() => navigate('/ai-strategy-tasks')}>基于此创建</Button> },
+    { title: '操作', render: (_, _r) => <Button type="link" onClick={() => navigate('/ai-strategy-center')}>基于此创建</Button> },
   ]
 
   return (

@@ -12,6 +12,7 @@ import AiOpsEffectOverviewPage from './pages/aiops/AiOpsEffectOverviewPage'
 import AiOpsEffectReviewPage from './pages/aiops/AiOpsEffectReviewPage'
 import AiOpsTaskHistoryPage from './pages/aiops/AiOpsTaskHistoryPage'
 import AiOpsStrategyTemplatesPage from './pages/aiops/AiOpsStrategyTemplatesPage'
+import AiCapabilityHubPage from './pages/aiops/AiCapabilityHubPage'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Orders from './pages/Orders'
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="ai-effect-overview" element={<PermissionGuard permission={NAV_PERMISSION['ai-effect-overview']}><AiOpsEffectOverviewPage /></PermissionGuard>} />
         <Route path="ai-effect/:id" element={<PermissionGuard permission={NAV_PERMISSION['ai-effect']}><AiOpsEffectReviewPage /></PermissionGuard>} />
         <Route path="ai-strategy-templates" element={<PermissionGuard permission={NAV_PERMISSION['ai-strategy-templates']}><AiOpsStrategyTemplatesPage /></PermissionGuard>} />
+        <Route path="ai-capability" element={<PermissionGuard permission={NAV_PERMISSION['ai-capability']}><AiCapabilityHubPage /></PermissionGuard>} />
         <Route path="product-agent" element={<PermissionGuard permission={NAV_PERMISSION['product-agent']}><ProductAgentPage /></PermissionGuard>} />
         <Route path="operations-agent" element={<PermissionGuard permission={NAV_PERMISSION['operations-agent']}><OperationsAgentPage /></PermissionGuard>} />
         <Route path="customer-agent" element={<PermissionGuard permission={NAV_PERMISSION['customer-agent']}><CustomerAgentPage /></PermissionGuard>} />
@@ -129,10 +131,12 @@ export default function App() {
         <Route path="ad-campaigns" element={<PermissionGuard permission={NAV_PERMISSION['ad-campaigns']}><AdCampaignsPage /></PermissionGuard>} />
         <Route path="finance-settlements" element={<Guard><FinanceSettlementsPage /></Guard>} />
         <Route path="statistics" element={<Guard><StatisticsPage /></Guard>} />
-        {/* 商品中心（ERP） */}
+        {/* AI 智能经营：任务工作台详情（带 :taskId） */}
+        <Route path="ai/tasks/:taskId" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
         <Route path="ai-risk-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage /></PermissionGuard>} />
         <Route path="ai-strategy-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
         <Route path="ai-approval-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
+        <Route path="ai-execution-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
         <Route path="products" element={<PermissionGuard permission={NAV_PERMISSION.products}><Products /></PermissionGuard>} />
         <Route path="skus" element={<PermissionGuard permission={NAV_PERMISSION.skus}><Products /></PermissionGuard>} />
         <Route path="listings" element={<PermissionGuard permission={NAV_PERMISSION.listings}><ListingsPage /></PermissionGuard>} />
