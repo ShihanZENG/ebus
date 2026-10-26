@@ -110,6 +110,7 @@ export default function App() {
         <Route path="lim-skills" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="skills" /></PermissionGuard>} />
         <Route path="lim-model-gateway" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="modelGateway" /></PermissionGuard>} />
         <Route path="lim-safety" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="security" /></PermissionGuard>} />
+        <Route path="lim-diagnosis" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="diagnosis" /></PermissionGuard>} />
         <Route path="lim-replenishment" element={<PermissionGuard permission="purchase_agent:read"><LimReplenishmentPage /></PermissionGuard>} />
         <Route path="oms-reconciliation-prep" element={<PermissionGuard permission="orders:read"><OmsReconciliationPrepPage /></PermissionGuard>} />
         <Route path="ai-assistant" element={<PermissionGuard permission={NAV_PERMISSION['ai-assistant']}><AssistantEntryPage /></PermissionGuard>} />

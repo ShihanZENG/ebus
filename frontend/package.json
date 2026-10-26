@@ -9,6 +9,7 @@
     "test:demo-credentials": "node --test tests/demoCredentials.test.mjs",
     "test:shipments": "node --test tests/shipmentStatus.test.mjs",
     "test:payment-evidence": "node --test tests/paymentEvidence.test.mjs",
+    "test:diagnosis": "node --test tests/diagnosisView.test.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

@@ -115,4 +115,36 @@ export const limApi = {
   approveRun: (id: string) => request<LimRun>(`/lim/runs/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
   rejectRun: (id: string, reason?: string) => request<LimRun>(`/lim/runs/${encodeURIComponent(id)}/reject`, { method: 'POST', params: reason ? { reason } : {} }),
   safetyOverview: () => request<LimSafetyOverview>('/lim/safety/overview'),
+  diagnose: (body: LimDiagnosisInput) => request<LimDiagnosis>('/lim/diagnoses', { method: 'POST', body }),
+  diagnoses: () => request<{ items: LimDiagnosis[]; total: number; page: number; page_size: number }>('/lim/diagnoses'),
+}
+
+export type LimDiagnosisAgent = {
+  domain: string
+  agent: string
+  status: 'ok' | 'denied' | 'error' | 'skipped'
+  ref_count: number
+  gap_count: number
+  finding_count: number
+}
+export type LimDiagnosis = {
+  diagnosis_id: string
+  shop_id: string
+  period: { date_from: string; date_to: string }
+  domains: string[]
+  agents: LimDiagnosisAgent[]
+  evidence_refs: Array<Record<string, unknown>>
+  gaps: Array<Record<string, unknown>>
+  findings: Array<Record<string, unknown>>
+  permission_gaps: Array<{ domain: string; permission: string }>
+  summary: string
+  supervisor_plan: string[]
+  generated_at: string
+}
+export type LimDiagnosisInput = {
+  shop_id: string
+  date_from: string
+  date_to: string
+  domains?: string[]
+  sku_codes?: string[]
 }

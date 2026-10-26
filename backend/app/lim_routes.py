@@ -35,6 +35,7 @@ from .lim_knowledge import (activate_knowledge_version, archive_knowledge_versio
                            update_knowledge_source, visible_knowledge_sources, sync_knowledge_sources)
 from .schemas import PERMISSIONS
 from .security import record_audit, require, role_for, session_db
+from .lim_diagnosis import DIAGNOSES, run_diagnosis
 
 router = APIRouter(prefix='/api/v1/lim', tags=['LIM Runtime 与治理'])
 
@@ -1395,6 +1396,60 @@ def model_metrics(days: int = Query(7, ge=1, le=90), db=Depends(session_db),
     from .lim_governance import governance_status
     filters = _model_call_filters(db, user) + [LimModelCall.created_at >= m.now() - timedelta(days=days)]
     return {**aggregate_model_calls(db, filters), 'days': days, 'governance': governance_status()}
+
+class DiagnosisInput(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+
+    shop_id: str = Field(min_length=1, max_length=64)
+    date_from: str = Field(min_length=10, max_length=10, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    date_to: str = Field(min_length=10, max_length=10, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    sku_codes: list[str] = Field(default_factory=list, max_length=200)
+    domains: list[str] = Field(default_factory=list, max_length=8)
+
+    def normalized_domains(self):
+        from .lim_diagnosis import normalize_domains
+        return normalize_domains(self.domains)
+
+
+@router.post('/diagnoses', status_code=201)
+def create_diagnosis(payload: DiagnosisInput, db=Depends(session_db), user=Depends(require('assistant:read'))):
+    """LangGraph 多智能体联合诊断：并行采集订单/广告/库存对齐/收款证据并合成结论。
+
+    只读端点（assistant:read）。本步诊断记录仅存于进程内存，重启后清空；任务重启恢复留待下一步。
+    """
+    params = {
+        'shop_id': payload.shop_id, 'date_from': payload.date_from, 'date_to': payload.date_to,
+        'sku_codes': payload.sku_codes, 'domains': payload.normalized_domains(),
+    }
+    try:
+        result = run_diagnosis(db, user, params)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    record_audit(db, user, 'lim_diagnoses', result['diagnosis_id'], 'run', after={
+        'shop_id': result['shop_id'], 'domains': result['domains'],
+        'agent_count': len(result.get('agents', [])), 'ref_count': len(result.get('evidence_refs', [])),
+        'finding_count': len(result.get('findings', [])), 'permission_gap_count': len(result.get('permission_gaps', [])),
+    })
+    db.commit()
+    return result
+
+
+@router.get('/diagnoses')
+def list_diagnoses(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                   db=Depends(session_db), user=Depends(require('assistant:read'))):
+    items = sorted(DIAGNOSES.values(), key=lambda d: d['generated_at'], reverse=True)
+    total = len(items)
+    start = (page - 1) * page_size
+    return {'items': items[start:start + page_size], 'total': total, 'page': page, 'page_size': page_size}
+
+
+@router.get('/diagnoses/{diagnosis_id}')
+def get_diagnosis(diagnosis_id: str, db=Depends(session_db), user=Depends(require('assistant:read'))):
+    row = DIAGNOSES.get(diagnosis_id)
+    if row is None:
+        raise HTTPException(404, '诊断记录不存在或已过期（本步仅内存存储，重启后清空）')
+    return row
+
 
 @router.get('/safety/overview')
 def lim_safety_overview(db=Depends(session_db), user=Depends(require('assistant:read'))):

@@ -1,4 +1,5 @@
 import ModelGatewayOverview from '../components/ModelGatewayOverview'
+import DiagnosisSection from '../components/DiagnosisSection'
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -15,7 +16,7 @@ const utcDateOffset = (days: number) => {
   return value.toISOString().slice(0, 10)
 }
 
-type LimSection = 'overview' | 'agentRuntime' | 'toolRegistry' | 'workflow' | 'runs' | 'alerts' | 'eval' | 'knowledge' | 'skills' | 'modelGateway' | 'security'
+type LimSection = 'overview' | 'agentRuntime' | 'toolRegistry' | 'workflow' | 'runs' | 'alerts' | 'eval' | 'knowledge' | 'skills' | 'modelGateway' | 'security' | 'diagnosis'
 
 type DagTask = {
   node_id: string
@@ -89,7 +90,7 @@ type LimTraceData = { run_id: string; trace_id: string; execution_mode: 'live' |
 
 const LIM_SECTION_ROUTES: Record<LimSection, string> = {
   overview: 'lim-console', agentRuntime: 'lim-agent-runtime', toolRegistry: 'lim-tool-registry', workflow: 'lim-workflow', runs: 'lim-runs',
-  alerts: 'lim-alerts', eval: 'lim-eval', knowledge: 'lim-knowledge', skills: 'lim-skills', modelGateway: 'lim-model-gateway', security: 'lim-safety',
+  alerts: 'lim-alerts', eval: 'lim-eval', knowledge: 'lim-knowledge', skills: 'lim-skills', modelGateway: 'lim-model-gateway', security: 'lim-safety', diagnosis: 'lim-diagnosis',
 }
 
 export default function LimConsolePage({ section = 'overview' }: { section?: LimSection }) {
@@ -829,6 +830,7 @@ export default function LimConsolePage({ section = 'overview' }: { section?: Lim
           <Card title="已知限制（本阶段）"><ul style={{ margin: 0, paddingLeft: 18 }}>{safetyOverview.known_limits.map((limit) => <li key={limit}>{limit}</li>)}</ul></Card>
         </> : <Card loading>加载安全策略概览中…</Card>}
       </Space> },
+      { key: 'diagnosis', label: '多智能体联合诊断', children: <DiagnosisSection /> },
       { key: 'alerts', label: `运行告警${alerts.filter((item) => item.status === 'OPEN').length ? ` (${alerts.filter((item) => item.status === 'OPEN').length})` : ''}`, children: <Space direction="vertical" style={{ width: '100%' }} size="large">
         <Alert type="info" showIcon message="本页提供本地告警记录、确认/关闭和阈值管理。邮件、Slack、PagerDuty 等生产通知尚未配置。" />
         <Card title="告警规则"><Table rowKey="rule_key" size="small" pagination={false} dataSource={alertRules} columns={[

@@ -208,6 +208,7 @@ const LIM_NAV: NavNode[] = [
     ],
   },
   { key: 'lim-safety', label: '11 安全与治理' },
+  { key: 'lim-diagnosis', label: '12 多智能体联合诊断' },
 ]
 
 const STOREFRONT_NAV: NavNode[] = [
@@ -232,7 +233,7 @@ export const SYSTEM_NAV: SystemNavigation[] = [
 const SYSTEM_ONLY_ROUTES: Record<SystemNavigation['id'], Set<string>> = {
   erp: new Set(),
   ai: new Set(['ai/tasks', 'ai-dashboard', 'ai-copilot', 'ai-copilot-analysis', 'ai-risk-center', 'ai-strategy-center', 'ai-approval-center', 'ai-execution-center', 'ai-agent-workbench', 'ai-agent-collab', 'ai-effect-overview', 'ai-effect', 'ai-task-history', 'ai-strategy-templates', 'ai-capability', 'product-agent', 'operations-agent', 'lim-replenishment', 'purchase-agent', 'ad-growth', 'profit-finance', 'customer-agent']),
-  lim: new Set(['lim-console', 'lim-agent-runtime', 'lim-tool-registry', 'lim-workflow', 'lim-runs', 'lim-alerts', 'lim-eval', 'lim-knowledge', 'lim-skills', 'lim-model-gateway']),
+  lim: new Set(['lim-console', 'lim-agent-runtime', 'lim-tool-registry', 'lim-workflow', 'lim-runs', 'lim-alerts', 'lim-eval', 'lim-knowledge', 'lim-skills', 'lim-model-gateway', 'lim-diagnosis']),
   storefront: new Set(['storefront']),
 }
 
@@ -331,6 +332,7 @@ export const NAV_PERMISSION: Record<string, string> = {
   'lim-skills': 'assistant:read',
   'lim-model-gateway': 'assistant:read',
   'lim-safety': 'assistant:read',
+  'lim-diagnosis': 'assistant:read',
   'lim-replenishment': 'purchase_agent:read',
   'oms-reconciliation-prep': 'orders:read',
   'product-agent': 'assistant:read',
@@ -386,6 +388,7 @@ export const MODULE_API: Record<string, string> = {
   'ai-task-history': '/api/v1/assistant/tasks（真实接口）',
   'lim-console': '/api/v1/lim/*',
   'lim-safety': 'GET /api/v1/lim/safety/overview',
+  'lim-diagnosis': 'POST /api/v1/lim/diagnoses（LangGraph 多智能体联合诊断；复用 business_evidence_tools 只读证据工具，supervisor→并行 workers→synthesis）',
   'lim-replenishment': '/api/v1/purchase-agent/profiles + /api/v1/lim/runs + /traces',
   'oms-reconciliation-prep': '/api/v1/reconciliation-prep/erp-orders + browser-local OMS JSON comparison',
   'product-agent': 'POST /api/v1/agents/product/ask',
