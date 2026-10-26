@@ -39,3 +39,10 @@ supervise.log
 storefront/.backup-*/
 storefront/.patch-*.cjs
 
+# 临时探针/草稿脚本（下划线前缀）与本地导出数据，禁止入库
+backend/_*.py
+backend/*.json
+!backend/package.json
+!backend/*.config.json
+frontend/_*.mjs
+
