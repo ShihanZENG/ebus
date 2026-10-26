@@ -97,7 +97,8 @@ class SupportRequest(Record, Base):
     __tablename__ = 'storefront_support_requests'
     __table_args__ = (UniqueConstraint('public_ref', name='uq_storefront_support_public_ref'),)
     site_id: Mapped[str] = mapped_column(ForeignKey('storefront_sites.id', ondelete='RESTRICT'), index=True)
-    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), index=True)
+    order_id: Mapped[str | None] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), nullable=True, index=True)
+    contact_email: Mapped[str] = mapped_column(String(254), default='', server_default='')
     public_ref: Mapped[str] = mapped_column(String(40))
     issue: Mapped[str] = mapped_column(String(32))
     message: Mapped[str] = mapped_column(Text)

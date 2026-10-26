@@ -8,6 +8,7 @@ import './style.css'
 import './dialog.css'
 import './editorial.css'
 import CustomerAccount from './CustomerAccount'
+import SupportContact, { type SupportContactHandle } from './SupportContact'
 import { ApiError, errorText, request, type Customer } from './customer-api'
 
 type Variant = { id: string; color: string; size: string; price: string; available_qty: number }
@@ -148,6 +149,7 @@ function App() {
   const refreshGate = useRef(createSingleFlight())
   const orderAutoLoad = useRef('')
   const modalRef = useRef<HTMLDialogElement>(null)
+  const supportContactRef = useRef<SupportContactHandle>(null)
   const openerRef = useRef<HTMLElement | null>(null)
   const privacyDialogRef = useRef<HTMLDialogElement>(null)
   const privacyOpenerRef = useRef<HTMLElement | null>(null)
@@ -638,6 +640,10 @@ function App() {
       <p role="status">当前状态：{analyticsConsent === 'granted' ? `已启用，本地有 ${analyticsEventCount} 条事件` : '关闭，未记录使用事件'}</p>
       <div className="privacy-actions"><button className="primary" onClick={() => chooseAnalyticsConsent('granted')}>{analyticsConsent === 'granted' ? '保持启用' : '同意并启用'}</button><button onClick={() => chooseAnalyticsConsent('denied')}>关闭并清除本地数据</button></div>
     </dialog>
+    <SupportContact key={customer?.id ?? 'guest'} ref={supportContactRef} preview={VISUAL_PREVIEW}
+      order={page === 'order' && order && orderRef ? { id: order.public_id, token: orderRef.token } : null}
+      onOrders={() => { setShowGuestOrders(false); navigate('account') }}
+      onSubmitted={() => { const version = privateVersion.current; if (order && orderRef) request<{ items: SupportSummary[] }>('/support-requests?order_ref=' + encodeURIComponent(order.public_id), { headers: orderRef.token ? { Authorization: 'Bearer ' + orderRef.token } : {} }).then(result => { if (version === privateVersion.current) setSupportRequests(result.items) }).catch(() => {}) }} />
     {selected && <dialog ref={modalRef} aria-label="商品详情与颜色尺码选择" className="product-modal" onClose={closeProduct} onClick={e => { if (e.target === e.currentTarget) closeProduct() }}>
       <button className="close" autoFocus aria-label="关闭商品详情" onClick={closeProduct}>×</button>
       <div className="product-modal-grid"><div className="modal-gallery"><div className="detail-gallery"><img src={(selected.gallery?.[galleryIndex] || selected.image_url) || '/knit.svg'} alt={`${selected.title}商品图 ${galleryIndex + 1}`} onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = '/knit.svg' }}/>{(selected.gallery?.length || 0) > 1 && <div className="gallery-picks" aria-label="商品图片">{selected.gallery?.map((src, index) => <button key={src} aria-label={`查看第 ${index + 1} 张商品图`} aria-pressed={galleryIndex === index} onClick={() => setGalleryIndex(index)}><img src={src} alt=""/></button>)}</div>}</div><div className="modal-gallery-caption">THE DAILY EDIT · ZHIJIAN STUDIO</div></div>
@@ -645,6 +651,7 @@ function App() {
       <div className="option-heading"><strong>选择颜色与尺码</strong><span>{selected.variants.length} 个规格</span></div><div className="variant-grid">{selected.variants.map(v => <button key={v.id} disabled={v.available_qty <= 0 || !!pending} aria-pressed={variantId === v.id} onClick={() => { setVariantId(v.id); recordLocal('variant_selected', { product_id: selected.id, sku_id: v.id }) }}><span>{v.color} · {v.size}</span><small>{v.available_qty > 0 ? `演示可用 ${v.available_qty} 件` : '暂时缺货'}</small></button>)}</div>
       <label>购买数量 <input aria-label="购买数量" type="number" min={1} max={Math.min(20, variant?.available_qty ?? 1)} step={1} disabled={!variant || variant.available_qty < 1} value={selectedQuantity} onChange={e => setSelectedQuantity(Number(e.target.value))} style={{ width: 80, padding: 8, margin: 12 }} /></label>
       {error && <p role="alert" className="alert">{error}</p>}<button className="primary modal-add" disabled={!variant || !!pending} onClick={addSelected}>加入购物袋 <span aria-hidden="true">↗</span></button><p className="modal-detail-note">{VISUAL_PREVIEW ? '视觉概念款，不能结账。' : '下单前重新核实价格与库存，本站不处理真实付款。'}</p>
+      <button className="product-contact" onClick={() => supportContactRef.current?.open({ slug: selected.slug, title: selected.title })}>咨询这件商品 · 联系客服</button>
       <details className="modal-accordion"><summary>商品材质与护理说明</summary><p>{selected.material || '材质信息待补充'}</p><p>{selected.care_instructions || '护理信息待补充'}</p></details>
       <details className="modal-accordion"><summary>查看商品尺寸表</summary>{selected.size_guide?.length ? <div className="size-guide-scroll"><table><thead><tr><th>尺码</th>{(['chest_cm', 'waist_cm', 'hip_cm', 'length_cm', 'sleeve_cm'] as const).map(key => selected.size_guide?.some(row => row[key] != null) && <th key={key}>{({ chest_cm: '胸围', waist_cm: '腰围', hip_cm: '臀围', length_cm: '衣长', sleeve_cm: '袖长' })[key]}</th>)}</tr></thead><tbody>{selected.size_guide.map(row => <tr key={row.size}><th>{row.size}</th>{(['chest_cm', 'waist_cm', 'hip_cm', 'length_cm', 'sleeve_cm'] as const).map(key => selected.size_guide?.some(item => item[key] != null) && <td key={key}>{row[key] ?? '—'}</td>)}</tr>)}</tbody></table></div> : <p>商品尺寸信息待补充。</p>}<p>尺寸请以样衣实测为准，S/M/L 不对应固定英国码。</p></details>
       <details className="modal-accordion"><summary>配送说明</summary><p>币种：GBP · 演示运费：£{site?.shipping_amount || '0.00'}</p><p>配送区域：{site?.delivery_regions?.join('、') || '英格兰、苏格兰、威尔士'}</p><p>{site?.shipping_note || '演示配送：提交订单后由演示 ERP 确认库存并备货，不接真实快递。'}</p></details>

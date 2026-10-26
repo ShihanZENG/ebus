@@ -1,0 +1,20 @@
+.support-launcher { position: fixed; right: 24px; bottom: 24px; z-index: 80; display: flex; align-items: center; gap: 10px; padding: 13px 19px; border: 1px solid #cfbda7; border-radius: 30px; background: #22392f; color: #fffdf7; box-shadow: 0 5px 24px #17281f29; cursor: pointer; }
+.support-launcher span { display: grid; text-align: left; font-size: 14px; line-height: 1.4; }
+.support-launcher small { font-size: 10px; opacity: .8; }
+.support-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 30px; border: 1px solid #dfd7ca; border-radius: 12px; background: #fffdf8; color: #23362d; overflow-y: auto; }
+.support-dialog::backdrop { background: #14271f80; }
+.support-dialog h2 { margin: 8px 0 12px; font-size: 25px; }
+.support-dialog .support-close { position: absolute; right: 12px; top: 8px; width: 36px; height: 36px; padding: 0; background: transparent; border: 0; font-size: 27px; color: #23362d; cursor: pointer; }
+.support-dialog fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.support-dialog label { display: grid; gap: 7px; margin-top: 16px; font-size: 13px; }
+.support-dialog input, .support-dialog textarea, .support-dialog select { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #cec8bd; border-radius: 5px; background: white; color: #23362d; font: inherit; font-size: 16px; }
+.support-dialog textarea { resize: vertical; }
+.support-hint { font-size: 12px; line-height: 1.7; color: #696c63; }
+.support-context { padding: 12px; background: #f0eee6; overflow-wrap: anywhere; font-size: 13px; }
+.support-dialog .support-submit, .support-success button { width: 100%; padding: 12px; background: #233c30; color: #fff; border: 0; border-radius: 5px; cursor: pointer; }
+.support-dialog .support-order-link { width: 100%; margin-top: 12px; padding: 8px; background: none; border: 0; text-decoration: underline; color: #344b3c; cursor: pointer; }
+.support-error { color: #a63228; font-size: 13px; }
+.support-success { line-height: 1.8; overflow-wrap: anywhere; }
+.support-dialog button:disabled { opacity: .55; cursor: not-allowed; }
+.product-contact { margin: 12px 0; width: 100%; padding: 12px; border: 1px solid #b9b9aa; background: transparent; color: #233c30; cursor: pointer; }
+@media (max-width: 600px) { .support-launcher { right: 14px; bottom: max(16px, env(safe-area-inset-bottom)); padding: 11px 14px; } .support-dialog { padding: 24px 20px; } }

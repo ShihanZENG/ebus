@@ -8,7 +8,7 @@ import { pricePatch } from './storefrontPublication.mjs'
 interface Variant { id: string; sku_id: string; color: string; size: string; price: string; available_qty: number }
 interface Product { id: string; title: string; slug: string; status: 'draft' | 'published'; version: number; gallery: string[]; material: string; care_instructions: string; size_guide: { size: string; chest_cm?: string; waist_cm?: string; hip_cm?: string; length_cm?: string; sleeve_cm?: string }[]; variants: Variant[] }
 interface Site { brand_name: string; company_name: string; company_address: string; contact_email: string; shop_name: string; warehouse_name: string }
-interface SupportRequest { id: string; ticket_ref: string; order_ref: string; issue: string; message: string; status: 'open' | 'in_progress' | 'resolved' | 'closed'; created_at: string }
+interface SupportRequest { id: string; ticket_ref: string; order_ref: string | null; contact_email?: string | null; issue: string; message: string; status: 'open' | 'in_progress' | 'resolved' | 'closed'; created_at: string }
 interface AfterSalesRow { id: string; public_ref: string; order_ref: string; kind: 'return' | 'refund'; items: { title: string; color: string; size: string; quantity: number; line_total: string }[]; reason: string; message: string; status: 'submitted' | 'processing' | 'completed' | 'rejected'; note: string; created_at: string | null }
 interface SourceProduct { id: string; code: string; name: string; description: string }
 interface SourceSku { id: string; code: string; name: string; attributes: Record<string, string> }
@@ -257,7 +257,8 @@ export default function StorefrontPage() {
       <Typography.Paragraph type="secondary">顾客提交时必须通过该订单的访问凭据验证。列表不包含收货地址；请勿要求顾客通过演示请求提交支付信息。</Typography.Paragraph>
       <Table<SupportRequest> rowKey="id" dataSource={supportRequests} pagination={{ pageSize: 10 }} size="small" scroll={{ x: 900 }}>
         <Table.Column title="请求编号" dataIndex="ticket_ref" />
-        <Table.Column title="商城订单号" dataIndex="order_ref" />
+        <Table.Column title="商城订单号" dataIndex="order_ref" render={(value: string | null) => value || '售前咨询'} />
+        <Table.Column title="联系邮箱" dataIndex="contact_email" />
         <Table.Column title="问题类型" dataIndex="issue" render={(value: string) => ({ product: '商品', delivery: '订单/配送', return: '退换/售后', other: '其他' }[value] || value)} />
         <Table.Column title="说明" dataIndex="message" width={300} render={(value: string) => <Typography.Text style={{ whiteSpace: 'normal' }}>{value}</Typography.Text>} />
         <Table.Column title="提交时间" dataIndex="created_at" render={(value: string) => value ? new Date(value).toLocaleString('zh-CN') : '—'} />

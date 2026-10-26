@@ -210,3 +210,9 @@ class SupportRequestInput(Input):
 
 class SupportStatusInput(Input):
     status: Literal['open', 'in_progress', 'resolved', 'closed']
+
+
+class PresalesEnquiryInput(Input):
+    contact_email: str = Field(min_length=3, max_length=254, pattern=r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+    message: str = Field(min_length=1, max_length=2000)
+    product_slug: str | None = Field(default=None, min_length=1, max_length=80)

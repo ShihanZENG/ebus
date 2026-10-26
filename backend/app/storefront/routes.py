@@ -280,6 +280,26 @@ def get_order(public_id: str, request: Request, credentials=Depends(bearer), db=
     return svc.public_order(db, meta)
 
 
+@router.post('/support-requests/enquiries', status_code=201)
+def create_presales_enquiry(payload: s.PresalesEnquiryInput, db=Depends(session_db)):
+    site = svc.site(db)
+    message = payload.message
+    if payload.product_slug:
+        product = db.scalar(select(sm.Product).join(m.Product, m.Product.id == sm.Product.product_id).where(
+                            sm.Product.site_id == site.id, sm.Product.slug == payload.product_slug,
+                            sm.Product.status == 'published', m.Product.is_active.is_(True)))
+        if product is None:
+            raise HTTPException(404, '商品不存在或已下架，请重新选择商品')
+        message = f'商品咨询：{product.title}（{product.slug}）\n{message}'
+    enquiry = sm.SupportRequest(site_id=site.id, order_id=None,
+                               contact_email=payload.contact_email,
+                               public_ref='ZJS-' + secrets.token_hex(8).upper(),
+                               issue='product' if payload.product_slug else 'other', message=message)
+    db.add(enquiry)
+    db.commit()
+    return {'ticket_ref': enquiry.public_ref, 'status': enquiry.status, 'demo': True}
+
+
 @router.post('/support-requests', status_code=201)
 async def create_support_request(request: Request, credentials=Depends(bearer), db=Depends(session_db)):
     site = svc.site(db)
@@ -449,6 +469,7 @@ def customer_after_sales(request: Request, order_ref: str = Query(..., min_lengt
 
 def support_dto(request):
     return {'id': request.id, 'ticket_ref': request.public_ref, 'order_ref': None,
+            'contact_email': request.contact_email,
             'issue': request.issue, 'message': request.message, 'status': request.status,
             'created_at': request.created_at.isoformat() + 'Z' if request.created_at else None,
             'updated_at': request.updated_at.isoformat() + 'Z' if request.updated_at else None}
