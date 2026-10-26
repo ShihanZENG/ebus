@@ -375,7 +375,7 @@ draft（草稿）→ approved（已审批）→ partially\_received（部分收�
 | ------- | ------------------------------------------ |
 | 服务地址    | `https://47.107.76.124/data-lab/`          |
 | 认证方式    | Header: `X-API-Key: <key>`                 |
-| API Key | `NgWV3uEhKg_tHrY9fD06DNIkS254lKhT-jZPhxhs` |
+| API Key | 由 `backend/.env` 的 `DATALAB_API_KEY` 提供（勿写入文档/源码） |
 | 数据仓库层数  | ODS → DIM → DWD → DWS → ADS（共 141 张表）      |
 
 ### 6.2 接入方式

@@ -22,7 +22,7 @@ def test_create_fact_based_reviewed_draft_and_reject_self_review(setup, monkeypa
     client, auth, _ = setup
     listing, _ = make_listing(client, auth)
     captured = {}
-    def fake(messages, tools, timeout):
+    def fake(messages, tools, timeout, **kwargs):
         captured['messages'] = messages
         return {'content': good_result()}
     monkeypatch.setattr(listing_agent, 'completion', fake)
@@ -45,7 +45,7 @@ def test_create_fact_based_reviewed_draft_and_reject_self_review(setup, monkeypa
 def test_other_reviewer_can_approve(setup, monkeypatch):
     client, auth, _ = setup
     listing, shop = make_listing(client, auth)
-    monkeypatch.setattr(listing_agent, 'completion', lambda *args: {'content': good_result()})
+    monkeypatch.setattr(listing_agent, 'completion', lambda *args, **kwargs: {'content': good_result()})
     draft = client.post('/api/v1/listing-agent/drafts', headers=auth,
         json={'listing_id': listing['id'], 'target_language': 'English'}).json()
     role = client.post('/api/v1/roles', headers=auth, json={'code': 'listing-reviewer',
@@ -60,7 +60,7 @@ def test_other_reviewer_can_approve(setup, monkeypatch):
 def test_source_change_marks_draft_stale_and_blocks_approval(setup, monkeypatch):
     client, auth, _ = setup
     listing, shop = make_listing(client, auth)
-    monkeypatch.setattr(listing_agent, 'completion', lambda *args: {'content': good_result()})
+    monkeypatch.setattr(listing_agent, 'completion', lambda *args, **kwargs: {'content': good_result()})
     draft = client.post('/api/v1/listing-agent/drafts', headers=auth,
         json={'listing_id': listing['id'], 'target_language': 'English'}).json()
     assert client.patch(f"/api/v1/listings/{listing['id']}", headers=auth,
@@ -98,7 +98,7 @@ def test_scope_missing_listing_and_permissions(setup):
 def test_bad_and_claim_risky_model_output(setup, monkeypatch, content):
     client, auth, _ = setup
     listing, _ = make_listing(client, auth)
-    monkeypatch.setattr(listing_agent, 'completion', lambda *args: {'content': content})
+    monkeypatch.setattr(listing_agent, 'completion', lambda *args, **kwargs: {'content': content})
     response = client.post('/api/v1/listing-agent/drafts', headers=auth,
         json={'listing_id': listing['id'], 'target_language': 'English'})
     if content.startswith('{') and 'Best official' in content:
@@ -111,7 +111,7 @@ def test_bad_and_claim_risky_model_output(setup, monkeypatch, content):
 def test_draft_does_not_change_listing_and_records_audit(setup, monkeypatch):
     client, auth, _ = setup
     listing, _ = make_listing(client, auth)
-    monkeypatch.setattr(listing_agent, 'completion', lambda *args: {'content': good_result()})
+    monkeypatch.setattr(listing_agent, 'completion', lambda *args, **kwargs: {'content': good_result()})
     response = client.post('/api/v1/listing-agent/drafts', headers=auth,
         json={'listing_id': listing['id'], 'target_language': 'English'})
     assert response.status_code == 201

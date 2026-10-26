@@ -177,7 +177,7 @@ def test_model_protocol_calls_tools_and_cannot_approve(setup, monkeypatch):
     ident = env[3]['id']
     outputs = iter([tool_call('get_supply_evidence', ident), tool_call('calculate_supply', ident),
                     tool_call('create_supply_draft', ident), {'role': 'assistant', 'content': '已生成待审批草稿，存在时效缺口。'}])
-    def fake(messages, tools, timeout):
+    def fake(messages, tools, timeout, **kwargs):
         assert 'approve' not in json.dumps(tools)
         assert timeout <= 40
         return next(outputs)
@@ -205,7 +205,7 @@ def test_model_failure_rolls_back_uncommitted_drafts(setup, monkeypatch):
     configure_model(monkeypatch)
     ident = env[3]['id']
     outputs = iter([tool_call('get_supply_evidence', ident), tool_call('calculate_supply', ident), tool_call('create_supply_draft', ident)])
-    def fake(*args):
+    def fake(*args, **kwargs):
         try:
             return next(outputs)
         except StopIteration:
@@ -235,7 +235,7 @@ def test_tool_schema_rejects_fabricated_quantity_and_unknown_profile(setup, monk
     configure_model(monkeypatch)
     outputs = iter([tool_call('create_supply_draft', env[3]['id'], {'quantity': 999}),
                     tool_call('get_supply_evidence', 'x' * 36), {'role': 'assistant', 'content': '无法生成'}])
-    monkeypatch.setattr(llm, 'completion', lambda *args: next(outputs))
+    monkeypatch.setattr(llm, 'completion', lambda *args, **kwargs: next(outputs))
     r = env[0].post('/api/v1/purchase-agent/chat', headers=env[1], json={'message': '生成',
         'profile_ids': [env[3]['id']], 'business_date': env[5].isoformat(), 'allow_drafts': True})
     assert r.json()['status'] == 'FAILED'

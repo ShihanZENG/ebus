@@ -1,17 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Card, Statistic, Row, Col, Table, Tag, Spin, message } from 'antd'
+import { Alert, Button, Card, Statistic, Row, Col, Table, Tag, Spin, message } from 'antd'
 import api from '../api'
+import DataProvenance, { type DataMeta } from '../components/DataProvenance'
+import FinanceFeeReconciliationPanel from './FinanceFeeReconciliationPanel'
 
 export default function FinanceSettlementsPage() {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [dataMeta, setDataMeta] = useState<DataMeta | null>(null)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    api.get('/datalab/table/dws_finance_day', { params: { limit: 100 } })
-      .then((r) => setRows(r.data.rows || []))
-      .catch(() => message.error('财务数据加载失败'))
-      .finally(() => setLoading(false))
-  }, [])
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await api.get<{ rows?: any[]; data_meta: DataMeta }>('/datalab/table/dws_finance_day', { params: { limit: 100 } })
+      setRows(response.data.rows || [])
+      setDataMeta(response.data.data_meta)
+    } catch (cause) {
+      const description = cause instanceof Error ? cause.message : '财务 DataLab 数据加载失败'
+      setError(description)
+      setDataMeta({ source: 'datalab', source_mode: 'warehouse_snapshot', data_status: 'unavailable',
+        upstream_updated_at: null, upstream_freshness: 'not_provided', sample_status: 'unclassified' })
+      message.error('财务数据加载失败')
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { void load() }, [])
 
   const totals = useMemo(() => {
     const cny = rows.filter((r) => r.currency === 'CNY').reduce((s, r) => s + Number(r.amount || 0), 0)
@@ -34,6 +49,10 @@ export default function FinanceSettlementsPage() {
         <Col span={6}><Card><Statistic title="数据来源" value="DataLab" valueStyle={{ fontSize: 18 }} /></Card></Col>
       </Row>
 
+      <DataProvenance title="DataLab 财务快照" meta={dataMeta} />
+      {error && <Alert style={{ marginBottom: 16 }} type="error" showIcon message="财务快照暂不可用" description={error} action={<Button size="small" onClick={() => void load()}>重试</Button>} />}
+      {!error && <Alert style={{ marginBottom: 16 }} type="info" showIcon message="有限行快照" description="本页最多读取 100 行后在页面汇总；行数可能不完整，不能作为全量财务汇总或逐笔凭据。DataLab 未提供上游更新时间，本次查询时间不代表数据刷新时间。" />}
+
       <Card title="每日财务汇总">
         <Table
           size="small"
@@ -52,6 +71,7 @@ export default function FinanceSettlementsPage() {
           ]}
         />
       </Card>
+      <FinanceFeeReconciliationPanel />
     </>
   )
 }

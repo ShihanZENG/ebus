@@ -6,13 +6,15 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import Numeric, and_, case, cast, func, or_, select
 
 from . import models as m
 from .agent_generation import Generation
+from .common import money as _money
 from .security import record_audit, require, session_db
+from .provenance import local_record_meta
 
 
 router = APIRouter(prefix='/api/v1/profit-reconciliations', tags=['利润与对账'])
@@ -98,7 +100,9 @@ def currency_reconciliation_summary(
     """Summarize recorded order cash and fee evidence by original currency."""
     scope = user.shop_scope
     if scope is not None and not scope:
-        return {'by_currency': []}
+        return {'by_currency': [], 'data_meta': local_record_meta(record_count=0,
+            latest_updated_at=None, update_semantics='授权店铺范围内的本地财务来源记录',
+            simulated_record_count=0, payment_record_counts={})}
 
     payment_recognized = or_(
         m.PaymentRecord.record_type == 'legacy',
@@ -205,8 +209,44 @@ def currency_reconciliation_summary(
                     'unpaid_order_amount', 'platform_fee_amount', 'fee_reconciliation_observed_amount'):
             row[key] = _money(row[key])
         result.append(row)
+
+    payment_scope = [m.SalesOrder.status != 'cancelled']
+    if scope is not None:
+        payment_scope.append(m.SalesOrder.shop_id.in_(scope))
+    payment_counts = {
+        f'{record_type}:{reconciliation_status}': count
+        for record_type, reconciliation_status, count in db.execute(
+            select(m.PaymentRecord.record_type, m.PaymentRecord.reconciliation_status, func.count())
+            .join(m.SalesOrder, m.SalesOrder.id == m.PaymentRecord.order_id)
+            .where(*payment_scope)
+            .group_by(m.PaymentRecord.record_type, m.PaymentRecord.reconciliation_status)).all()
+    }
+    payment_count = sum(payment_counts.values())
+    latest_payment = db.scalar(select(func.max(m.PaymentRecord.updated_at))
+        .join(m.SalesOrder, m.SalesOrder.id == m.PaymentRecord.order_id).where(*payment_scope))
+    refund_source_count = db.scalar(select(func.count()).select_from(m.AfterSale)
+        .join(m.SalesOrder, m.SalesOrder.id == m.AfterSale.order_id).where(*refund_conditions)) or 0
+    latest_refund = db.scalar(select(func.max(m.AfterSale.updated_at))
+        .join(m.SalesOrder, m.SalesOrder.id == m.AfterSale.order_id).where(*refund_conditions))
+    order_count = db.scalar(select(func.count()).select_from(m.SalesOrder).where(*order_conditions)) or 0
+    latest_order = db.scalar(select(func.max(m.SalesOrder.updated_at)).where(*order_conditions))
+    fee_count = db.scalar(select(func.count()).select_from(Generation).where(*fee_conditions)) or 0
+    latest_fee = db.scalar(select(func.max(Generation.updated_at)).where(*fee_conditions))
+    source_times = [value for value in (latest_order, latest_payment, latest_refund, latest_fee) if value]
+    latest_source_update = max(source_times) if source_times else None
+    source_record_count = order_count + payment_count + refund_source_count + fee_count
+    data_meta = local_record_meta(
+        record_count=source_record_count,
+        latest_updated_at=latest_source_update,
+        update_semantics='订单、收款、退款及平台费用核验本地记录 updated_at 的最大值；不代表银行或平台同步时间',
+        simulated_record_count=sum(count for key, count in payment_counts.items() if key.startswith('simulated:')),
+        unclassified_legacy_payment_count=sum(count for key, count in payment_counts.items()
+                                              if key.startswith('legacy:')),
+        payment_record_counts=payment_counts,
+    )
     return {
         'by_currency': result,
+        'data_meta': data_meta,
         'definitions': {
             'order_amount': '未取消订单应付金额；按订单原币统计',
             'received_amount': '订单收款进度：历史记录原登记金额 + 已核对真实记录的结算毛额；模拟及待核对记录不计入。历史记录真实性未分类',
@@ -218,10 +258,6 @@ def currency_reconciliation_summary(
             'fee_review_pending_count': '仍待人工审核的平台费用核验记录数',
         },
     }
-
-
-def _money(value: Decimal) -> str:
-    return str(value.quantize(CENT, rounding=ROUND_HALF_UP))
 
 
 def _hash(value: dict) -> str:
@@ -351,7 +387,8 @@ def create_fee_discrepancy(
         'agent_generations',
         row.id,
         'reconcile_fee',
-        after={'status': result['status'], 'evidence_hash': evidence_hash},
+        after={'status': result['status'], 'evidence_hash': evidence_hash,
+               'evidence_snapshot': evidence},
     )
     db.commit()
     return {
@@ -359,7 +396,65 @@ def create_fee_discrepancy(
         'kind': row.kind,
         'source_reference': row.source_reference,
         'evidence_hash': row.evidence_hash,
+        'evidence': evidence,
         'review_required': True,
         'review_status': row.review_status,
         'result': result,
+    }
+
+
+@router.get('/fee-discrepancies')
+def list_fee_discrepancies(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    shop_id: str | None = None,
+    currency: str | None = Query(None, min_length=3, max_length=3),
+    source_reference: str | None = Query(None, min_length=1, max_length=500),
+    db=Depends(session_db),
+    user=Depends(require('finance_agent:read')),
+):
+    conditions = [Generation.kind == 'fee_reconciliation']
+    if user.shop_scope is not None:
+        if shop_id and shop_id not in user.shop_scope:
+            raise HTTPException(404, '费用复核记录不存在')
+        conditions.append(Generation.shop_id.in_(user.shop_scope) if user.shop_scope
+                          else Generation.shop_id == '')
+    if shop_id:
+        conditions.append(Generation.shop_id == shop_id)
+    if currency:
+        conditions.append(Generation.result['currency'].as_string() == currency.upper())
+    if source_reference:
+        conditions.append(Generation.source_reference.ilike(f'%{source_reference}%'))
+
+    total = db.scalar(select(func.count()).select_from(Generation).where(*conditions)) or 0
+    rows = db.scalars(select(Generation).where(*conditions)
+                      .order_by(Generation.created_at.desc(), Generation.id.desc())
+                      .offset((page - 1) * page_size).limit(page_size)).all()
+    evidence_by_id = {}
+    if rows:
+        audit_rows = db.scalars(select(m.AuditLog).where(
+            m.AuditLog.resource == 'agent_generations',
+            m.AuditLog.action == 'reconcile_fee',
+            m.AuditLog.record_id.in_([row.id for row in rows]),
+        )).all()
+        evidence_by_id = {
+            audit.record_id: (audit.after or {}).get('evidence_snapshot')
+            for audit in audit_rows
+        }
+    return {
+        'items': [{
+            'id': row.id,
+            'shop_id': row.shop_id,
+            'source_reference': row.source_reference,
+            'evidence_hash': row.evidence_hash,
+            'evidence': evidence_by_id.get(row.id),
+            'created_at': row.created_at.isoformat(),
+            'review_required': row.review_status == 'pending',
+            'review_status': row.review_status,
+            'review_note': row.review_note,
+            'result': row.result,
+        } for row in rows],
+        'total': total,
+        'page': page,
+        'page_size': page_size,
     }

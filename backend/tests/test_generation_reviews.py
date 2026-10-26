@@ -37,7 +37,7 @@ def test_generation_defaults_to_pending_and_scoped_reader_can_list(setup, monkey
     client, admin_auth, engine = setup
     shops = client.get('/api/v1/shops', headers=admin_auth).json()['items']
     shop = shops[0]
-    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout: {
+    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout, **kwargs: {
         'content': '基于所列数据的待审核说明。',
     })
     created = client.post(
@@ -67,7 +67,7 @@ def test_generation_defaults_to_pending_and_scoped_reader_can_list(setup, monkey
 def test_admin_decision_is_single_use_and_audited(setup, monkeypatch):
     client, admin_auth, engine = setup
     shop = client.get('/api/v1/shops', headers=admin_auth).json()['items'][0]
-    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout: {
+    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout, **kwargs: {
         'content': '基于所列数据的待审核说明。',
     })
     created = client.post(

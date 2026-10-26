@@ -1,1 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 350"><title>针织演示版型，非实物照片</title><path fill="#783e50" d="M100 53 130 38Q150 62 170 38L200 53 246 165 209 181 186 123 193 280Q150 292 107 280L114 123 91 181 54 165Z"/><path fill="none" stroke="#ffffff50" stroke-width="2" d="M130 38Q150 82 170 38M111 265Q150 276 190 265M77 155 96 164M223 155 204 164"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 350" role="img" aria-label="织间日常针织衫 商品示意图（非实物照片）">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF7F1"/>
+      <stop offset="1" stop-color="#EFE6D8"/>
+    </linearGradient>
+    <linearGradient id="knit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E3D2B9"/>
+      <stop offset="1" stop-color="#D2BC9C"/>
+    </linearGradient>
+    <clipPath id="clip">
+      <path d="M128 126 Q150 146 172 126 L190 130 C214 138 228 148 236 162 L246 220 L220 228 L204 196 L200 298 L100 298 L96 196 L80 228 L54 220 L64 162 C72 148 86 138 110 130 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect x="0" y="0" width="300" height="350" rx="20" fill="url(#bg)"/>
+  <ellipse cx="150" cy="313" rx="84" ry="13" fill="#3A2A1C" opacity="0.07"/>
+
+  <path d="M128 126 Q150 146 172 126 L190 130 C214 138 228 148 236 162 L246 220 L220 228 L204 196 L200 298 L100 298 L96 196 L80 228 L54 220 L64 162 C72 148 86 138 110 130 Z" fill="url(#knit)"/>
+
+  <g clip-path="url(#clip)">
+    <rect x="150" y="120" width="120" height="200" fill="#C2A982" opacity="0.30"/>
+    <g stroke="#B4976F" stroke-width="1.4" opacity="0.22">
+      <line x1="50" y1="152" x2="250" y2="152"/>
+      <line x1="50" y1="166" x2="250" y2="166"/>
+      <line x1="50" y1="180" x2="250" y2="180"/>
+      <line x1="50" y1="194" x2="250" y2="194"/>
+      <line x1="50" y1="208" x2="250" y2="208"/>
+      <line x1="50" y1="222" x2="250" y2="222"/>
+      <line x1="50" y1="236" x2="250" y2="236"/>
+      <line x1="50" y1="250" x2="250" y2="250"/>
+      <line x1="50" y1="264" x2="250" y2="264"/>
+      <line x1="50" y1="278" x2="250" y2="278"/>
+    </g>
+    <g stroke="#B4976F" stroke-width="1" opacity="0.14">
+      <line x1="120" y1="148" x2="120" y2="298"/>
+      <line x1="135" y1="148" x2="135" y2="298"/>
+      <line x1="165" y1="148" x2="165" y2="298"/>
+      <line x1="180" y1="148" x2="180" y2="298"/>
+    </g>
+    <rect x="97" y="284" width="106" height="14" fill="#C2A982" opacity="0.55"/>
+  </g>
+
+  <path d="M130 126 Q150 144 170 126" fill="none" stroke="#B4976F" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+</svg>

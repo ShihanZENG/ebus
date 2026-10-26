@@ -13,12 +13,21 @@ RESOURCE_NAMES = ('products', 'skus', 'shops', 'warehouses', 'suppliers', 'dicti
                   'supplier_skus', 'purchase_orders', 'purchase_receipts', 'replenishment',
                   'purchase_plans', 'purchase_amendments', 'supplier_quotes',
                   'fba_plans', 'listings', 'customer_tickets', 'customers',
-                  'purchase_agent', 'purchase_agent_drafts', 'advertising_agent', 'finance_agent', 'channels', 'storefront')
-PERMISSIONS = {f'{r}:{a}' for r in RESOURCE_NAMES for a in ('read', 'write')} | {'audit:read', 'dashboard:read', 'assistant:read', 'purchase_agent:approve', 'ads_reports:write'}
+                  'purchase_agent', 'purchase_agent_drafts', 'advertising_agent', 'finance_agent', 'channels', 'storefront',
+                  'order_events', 'order_reservations', 'routing_rules', 'order_exceptions',
+                  'logistics_events', 'order_rules', 'fulfilment_tasks', 'order_sync')
+PERMISSIONS = {f'{r}:{a}' for r in RESOURCE_NAMES for a in ('read', 'write')} | {'audit:read', 'dashboard:read', 'assistant:read', 'lim:manage', 'purchase_agent:approve', 'ads_reports:write'}
 
 OrderStatus = Literal['draft', 'approved', 'shipping_requested', 'fulfilled', 'cancelled', 'after_sale']
+OrderDimensionStatus = Literal['created', 'confirmed', 'cancelled', 'completed',
+                               'unpaid', 'pending', 'paid', 'partially_refunded', 'refunded',
+                               'unallocated', 'allocated', 'picking', 'packed', 'shipped', 'delivered']
 AfterSaleType = Literal['return', 'refund']
 AfterSaleStatus = Literal['pending', 'completed', 'rejected']
+OrderExceptionType = Literal['payment', 'stockout', 'routing_failed', 'address', 'shipment_timeout',
+                             'logistics', 'sync_failure']
+OrderExceptionStatus = Literal['open', 'processing', 'resolved', 'ignored']
+LogisticsEventCode = Literal['picked', 'in_transit', 'out_for_delivery', 'delivered', 'exception']
 
 
 class Input(BaseModel):
@@ -267,6 +276,80 @@ class AfterSaleResolve(Input):
     status: Literal['completed', 'rejected']
 
 
+# ---------------- OMS 路由、异常、物流与规则 ----------------
+
+class RoutingRuleCreate(Input):
+    name: Name
+    priority: int = Field(default=100, ge=1, le=9999)
+    warehouse_id: Identifier
+    countries: list[str] = Field(default_factory=list, max_length=60)
+    shop_ids: list[Identifier] = Field(default_factory=list, max_length=60)
+    channel_codes: list[str] = Field(default_factory=list, max_length=60)
+    conditions: dict = Field(default_factory=dict)
+    is_active: bool = True
+    remark: str = Field(default='', max_length=500)
+
+
+class RoutingRulePatch(Input):
+    name: Name | None = None
+    priority: int | None = Field(default=None, ge=1, le=9999)
+    warehouse_id: Identifier | None = None
+    countries: list[str] | None = Field(default=None, max_length=60)
+    shop_ids: list[Identifier] | None = Field(default=None, max_length=60)
+    channel_codes: list[str] | None = Field(default=None, max_length=60)
+    conditions: dict | None = None
+    is_active: bool | None = None
+    remark: str | None = Field(default=None, max_length=500)
+
+
+class OrderRoutingInput(Input):
+    reason: str = Field(default='', max_length=500)
+
+
+class ManualRoutingInput(Input):
+    warehouse_id: Identifier
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class OrderExceptionCreate(Input):
+    order_id: Identifier
+    exception_type: OrderExceptionType
+    reason: str = Field(min_length=1, max_length=500)
+    detail: dict = Field(default_factory=dict)
+
+
+class OrderExceptionTransition(Input):
+    to: Literal['processing', 'resolved', 'ignored']
+    resolution: str = Field(default='', max_length=500)
+
+    @model_validator(mode='after')
+    def require_resolution_text(self):
+        if self.to in ('resolved', 'ignored') and not self.resolution.strip():
+            raise ValueError('关闭或忽略异常必须填写处理结论')
+        return self
+
+
+class LogisticsEventCreate(Input):
+    carrier: str = Field(default='', max_length=80)
+    event_code: LogisticsEventCode
+    occurred_at: datetime | None = None
+    message: str = Field(default='', max_length=500)
+    idempotency_key: str = Field(default='', max_length=160)
+
+    @field_validator('occurred_at')
+    @classmethod
+    def normalize_time(cls, value):
+        return value.astimezone(timezone.utc).replace(tzinfo=None) if value and value.tzinfo else value
+
+
+class OrderRulePatch(Input):
+    value: dict
+
+
+class ShipmentCarrierInfo(Input):
+    carrier: str = Field(min_length=1, max_length=80)
+
+
 class RefundExecution(Input):
     reference_no: str = Field(min_length=1, max_length=120)
     remark: str = Field(default='', max_length=500)
@@ -342,6 +425,10 @@ class PurchaseOrderPatch(Input):
     expected_arrival_date: datetime | None = None
     remark: str | None = Field(default=None, max_length=500)
     items: list[PurchaseOrderItemInput] | None = None
+
+
+class PurchaseOrderReject(Input):
+    reason: str = Field(min_length=1, max_length=480)
 
 
 class PurchaseReceiptItemInput(Input):

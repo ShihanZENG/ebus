@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [form] = Form.useForm()
 
-  if (token) return <Navigate to="/dashboard" replace />
+  if (token) return <Navigate to="/workspace" replace />
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true)
@@ -35,23 +35,23 @@ export default function LoginPage() {
         background: '#f2f4f7',
       }}
     >
-      <Card style={{ width: 380 }} styles={{ body: { padding: 32 } }}>
+      <Card style={{ width: 'min(380px, calc(100vw - 24px))' }} styles={{ body: { padding: 32 } }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <AppstoreOutlined style={{ fontSize: 32, color: '#2b5cff' }} />
           <Typography.Title level={4} style={{ marginTop: 12, marginBottom: 4 }}>
             跨境电商 ERP
           </Typography.Title>
-          <Typography.Text type="secondary">登录以继续</Typography.Text>
+          <Typography.Text style={{ color: '#595959' }}>登录以继续</Typography.Text>
         </div>
 
-        {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
+        {error && <Alert role="alert" type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
 
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark={false} size="large">
           <Form.Item name="username" rules={[{ required: true, message: '请输入账号' }]}>
-            <Input prefix={<UserOutlined />} placeholder="账号" autoComplete="username" />
+            <Input aria-label="账号" prefix={<UserOutlined aria-hidden="true" />} placeholder="账号" autoComplete="username" />
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="密码" autoComplete="current-password" />
+            <Input.Password aria-label="密码" prefix={<LockOutlined aria-hidden="true" />} placeholder="密码" autoComplete="current-password" />
           </Form.Item>
           {import.meta.env.DEV && __LOCAL_DEMO_CREDENTIALS__ && <Button
             htmlType="button"
@@ -64,7 +64,7 @@ export default function LoginPage() {
           </Button>
         </Form>
 
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 16, marginBottom: 0 }}>
+        <Typography.Paragraph style={{ color: '#595959', fontSize: 12, marginTop: 16, marginBottom: 0 }}>
           后端接口需在 127.0.0.1:18080 运行；账号由后端初始化命令创建。
         </Typography.Paragraph>
       </Card>

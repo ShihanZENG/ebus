@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from . import models as m, schemas as s
 from .security import session_db, require, record_audit
+from .provenance import local_record_meta
 
 
 # ---------- 核心库存操作 ----------
@@ -91,24 +92,48 @@ def release_order_stock(db, order):
         from .inventory_allocation import finish
         finish(db, shipment.warehouse_id, sku_id, 'order', order.id)
     shipment.status = 'cancelled'
+    from . import oms_state
+    lines = {}
+    for it in items:
+        lines[it.sku_id] = lines.get(it.sku_id, 0) + it.quantity
+    oms_state.reservation_record(db, order, 'released', warehouse_id=shipment.warehouse_id,
+                                 shipment_id=shipment.id, lines=lines,
+                                 idempotency_key=f'release:{shipment.id}',
+                                 event_message='订单取消，预留库存已释放')
     db.flush()
 
 
 def ship_order(db, shipment, tracking_no='', remark=''):
-    """确认出库：扣减在库和预留，更新订单状态为 fulfilled。"""
-    if shipment.status != 'picking':
+    """确认出库：扣减在库和预留，订单履约状态推进为已发货。"""
+    if shipment.status not in ('picking', 'packed'):
         raise HTTPException(422, f'出库单状态为 {shipment.status}，不能重复发货')
     items = db.scalars(select(m.ShipmentOrderItem).where(m.ShipmentOrderItem.shipment_id == shipment.id)).all()
     for sku_id in sorted({it.sku_id for it in items}):
         from .inventory_allocation import finish
         finish(db, shipment.warehouse_id, sku_id, 'order', shipment.order_id, ship=True)
     shipment.status = 'shipped'
+    shipment.stage = 'ship'
     shipment.tracking_no = tracking_no
     shipment.remark = (shipment.remark + ' | ' + remark) if remark else shipment.remark
     from .models import now
     shipment.shipped_at = now()
     order = db.get(m.SalesOrder, shipment.order_id)
-    order.status = 'fulfilled'
+    from . import oms_state
+    lines = {}
+    for it in items:
+        lines[it.sku_id] = lines.get(it.sku_id, 0) + it.quantity
+    if order.fulfillment_status in ('allocated', 'picking', 'packed'):
+        oms_state.set_state(db, order, 'fulfillment', 'shipped',
+                            message=f'确认出库，运单号 {tracking_no}' if tracking_no else '确认出库')
+    oms_state.reservation_record(db, order, 'consumed', warehouse_id=shipment.warehouse_id,
+                                 shipment_id=shipment.id, lines=lines,
+                                 idempotency_key=f'consume:{shipment.id}',
+                                 event_message='出库确认，预留库存已消耗')
+    oms_state.add_event(db, order.id, 'shipment', source='erp',
+                        message=f'出库单 {shipment.id[:8]} 已发货',
+                        payload={'shipment_id': shipment.id, 'tracking_no': tracking_no,
+                                 'carrier': shipment.carrier},
+                        idempotency_key=f'shipment-shipped:{shipment.id}')
     db.flush()
 
 
@@ -181,9 +206,12 @@ def inventory_summary(db=Depends(session_db), user=Depends(require('inventory:re
     low_count = db.scalar(select(func.count()).select_from(m.InventoryBalance).where(*low_conditions))
     low_items = db.scalars(select(m.InventoryBalance).where(*low_conditions)
         .order_by(available, m.InventoryBalance.id).limit(8)).all()
+    latest_updated_at = db.scalar(select(func.max(m.InventoryBalance.updated_at)).where(*conditions))
     return {'balance_count': total, 'on_hand_qty': on_hand, 'reserved_qty': reserved,
             'available_qty': on_hand - reserved, 'low_stock_count': low_count,
-            'low_stock_threshold': 120, 'low_stock_items': [balance_snapshot(row) for row in low_items]}
+            'low_stock_threshold': 120, 'low_stock_items': [balance_snapshot(row) for row in low_items],
+            'data_meta': local_record_meta(record_count=total, latest_updated_at=latest_updated_at,
+                update_semantics='inventory_balances.updated_at 在当前授权仓库范围内的最大值；不是平台同步时间')}
 
 
 @router.post('/warehouses/{warehouse_id}/inventory/adjust')

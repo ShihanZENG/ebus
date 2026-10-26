@@ -1,6 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+test('product quantity selection adds atomically within stock and checkout limits', async () => {
+  const { addItem } = await import('../src/cart.mjs')
+  const item = { variant_id: 'qty', price: '10.00', available_qty: 30 }
+  const cart = addItem([], item, 3)
+  assert.equal(cart[0].quantity, 3)
+  assert.equal(addItem(cart, item, 2)[0].quantity, 5)
+  assert.throws(() => addItem(cart, item, 18), /20/)
+  assert.throws(() => addItem([], { ...item, available_qty: 2 }, 3), /库存/)
+  assert.throws(() => addItem([], item, 1.5), /数量/)
+  assert.equal(cart[0].quantity, 3)
+})
+
 // Tests exercise cart behavior; a broken quantity merge or floating-point sum fails.
 test('cart merges only the same variant and respects stock', async () => {
   const { addItem, cartTotal } = await import('../src/cart.mjs')

@@ -3,14 +3,13 @@ import json
 import os
 import time
 from datetime import date, datetime, timezone
-from urllib.parse import urlparse
 
-import httpx
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from . import lim_model_gateway as gateway
 from . import models as m
 from .security import record_audit, require, session_db
 from .supply_agent import (AgentRun, SupplyChat, SupplyDraft, _call, calculate_supply, collect_evidence,
@@ -38,37 +37,14 @@ def llm_config():
     return base, key, model
 
 
-def completion(messages, tools, timeout):
-    base, key, model = llm_config()
-    parsed = urlparse(base)
-    if not all([base, key, model]):
-        raise RuntimeError('MODEL_NOT_CONFIGURED：请配置采购 Agent 模型地址、API Key 和模型名')
-    if parsed.scheme != 'https' and not (parsed.scheme == 'http' and parsed.hostname in ('127.0.0.1', 'localhost')):
-        raise RuntimeError('MODEL_CONFIG_INVALID：模型地址需为 HTTPS 或本机 HTTP')
-    payload = {'model': model, 'messages': messages, 'tools': tools, 'tool_choice': 'auto',
-               'max_tokens': 2048, 'stream': False}
-    if os.getenv('PURCHASE_AGENT_LLM_DISABLE_THINKING', 'false').lower() == 'true':
-        if parsed.hostname == 'api.deepseek.com':
-            payload['thinking'] = {'type': 'disabled'}
-        else:
-            payload['enable_thinking'] = False
-    try:
-        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
-            response = client.post(base + '/chat/completions', headers={'Authorization': 'Bearer ' + key}, json=payload)
-        if response.status_code != 200:
-            # 不记录供应商原始错误，避免其回显 token/请求内容。
-            raise RuntimeError(f'MODEL_HTTP_ERROR：模型服务返回 HTTP {response.status_code}，请检查配置、额度及模型权限')
-        data = response.json()
-        message = data['choices'][0]['message']
-        if not isinstance(message, dict):
-            raise ValueError()
-        return {k: v for k, v in message.items() if k in ('role', 'content', 'tool_calls')}
-    except httpx.TimeoutException:
-        raise RuntimeError('MODEL_TIMEOUT：模型调用超时，请稍后重试') from None
-    except httpx.HTTPError:
-        raise RuntimeError('MODEL_CONNECTION_ERROR：模型服务无法连接') from None
-    except (KeyError, IndexError, ValueError, TypeError):
-        raise RuntimeError('MODEL_RESPONSE_INVALID：模型返回格式无效') from None
+def completion(messages, tools, timeout, *, alias=None, scene='*', actor_id=None, run_id=None, span_id=None):
+    """统一经 LIM 模型网关调用模型。
+
+    前三个位置参数与 MODEL_* 错误码文案与既有实现完全一致；
+    新增参数全部为可选，故 5 个既有调用方无需任何改动。
+    """
+    return gateway.complete(messages, tools, timeout, alias=alias or gateway.DEFAULT_ALIAS,
+                            scene=scene, actor_id=actor_id, run_id=run_id, span_id=span_id)
 
 
 def tool_schema(name, description):
@@ -78,9 +54,12 @@ def tool_schema(name, description):
 
 
 @router.get('/runtime')
-def runtime(user=Depends(require('purchase_agent:read'))):
-    base, key, model = llm_config()
-    return {'model_configured': bool(base and key and model), 'model': model or None,
+def runtime(db=Depends(session_db), user=Depends(require('purchase_agent:read'))):
+    try:
+        _, _, model, _, _ = gateway.resolve(db, scene='supply')
+    except RuntimeError:
+        model = None
+    return {'model_configured': bool(model), 'model': model,
             'rule_version': 'supply-v2', 'max_tool_calls': 40, 'model_tools': ['get_supply_evidence', 'calculate_supply', 'get_business_analysis', 'create_supply_draft']}
 
 
@@ -123,8 +102,8 @@ def chat(payload: ChatInput, db=Depends(session_db), user=Depends(require('purch
         '。业务截止日：' + payload.business_date.isoformat() + '。草稿授权：' + str(payload.allow_drafts)},
         {'role': 'user', 'content': payload.message}]
     try:
-        if not all((base, key, model)):
-            raise RuntimeError('MODEL_NOT_CONFIGURED：请在 backend/.env 配置模型后重启后端')
+        _, _, model, _, _ = gateway.resolve(db, scene='supply')
+        chat_row.model = model
         call_count = 0
         for round_index in range(12):
             remaining = 150 - (time.monotonic() - started)
@@ -133,7 +112,7 @@ def chat(payload: ChatInput, db=Depends(session_db), user=Depends(require('purch
             model_start = time.monotonic()
             event('model_start', f'第 {round_index + 1} 轮模型请求', details={'model': model})
             try:
-                answer = completion(messages, tools, min(40, remaining))
+                answer = completion(messages, tools, min(40, remaining), actor_id=user.id, scene='supply')
             except RuntimeError:
                 event('model_end', f'第 {round_index + 1} 轮模型失败', 'error',
                       int((time.monotonic() - model_start) * 1000), {'model': model})

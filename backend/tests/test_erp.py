@@ -1,4 +1,5 @@
 import os
+import hashlib
 import uuid
 import pytest
 from alembic import command
@@ -187,7 +188,7 @@ def test_ads_report_preview_import_and_correct_existing_daily_row(setup):
     shop = client.get('/api/v1/shops', headers=auth).json()['items'][0]
     csv_content = (
         'report_date,campaign_id,campaign_name,campaign_status,currency,spend,impressions,clicks,orders,attributed_sales,sku_code\n'
-        '2026-10-17,CAMPAIGN-001,US Brand Exact,ENABLED,USD,12.50,1200,31,2,49.98,SKU-001\n'
+        '2026-10-17,CAMPAIGN-001,US Brand Exact,ENABLED,USD,12.50,1000,25,5,50.00,SKU-001\n'
     )
     payload = {'shop_id': shop['id'], 'source_name': 'ads-report.csv', 'csv_content': csv_content}
 
@@ -206,7 +207,8 @@ def test_ads_report_preview_import_and_correct_existing_daily_row(setup):
     assert duplicate.status_code == 200, duplicate.text
     assert duplicate.json()['idempotent'] is True
 
-    corrected_payload = {**payload, 'csv_content': csv_content.replace('12.50', '13.25')}
+    corrected_payload = {**payload, 'source_name': 'ads-report-correction.csv',
+                         'csv_content': csv_content.replace('12.50', '13.25')}
     corrected = client.post('/api/v1/ads-reports/import', headers=auth, json=corrected_payload)
     assert corrected.status_code == 200, corrected.text
     assert corrected.json()['corrected_count'] == 1
@@ -216,6 +218,53 @@ def test_ads_report_preview_import_and_correct_existing_daily_row(setup):
     assert rows.status_code == 200, rows.text
     assert rows.json()['total'] == 1
     assert rows.json()['items'][0]['spend'] == '13.25'
+    assert rows.json()['items'][0]['metrics'] == {
+        'ctr_percent': 2.5,
+        'cpc': 0.53,
+        'cvr_percent': 20.0,
+        'acos_percent': 26.5,
+        'roas': 50 / 13.25,
+    }
+    assert rows.json()['items'][0]['latest_batch_id'] == corrected.json()['id']
+
+    batches = client.get('/api/v1/ads-reports/batches', headers=auth).json()['items']
+    correction_batch = next(batch for batch in batches if batch['id'] == corrected.json()['id'])
+    assert correction_batch['source_name'] == 'ads-report-correction.csv'
+    assert correction_batch['actor_name'] == 'admin'
+    assert correction_batch['created_at']
+    assert correction_batch['content_hash'] == hashlib.sha256(corrected_payload['csv_content'].encode('utf-8')).hexdigest()
+
+
+def test_ads_report_metrics_return_unavailable_for_zero_denominators_and_missing_fields(setup):
+    client, auth, _ = setup
+    shop = client.get('/api/v1/shops', headers=auth).json()['items'][0]
+    headers = 'report_date,campaign_id,campaign_name,campaign_status,currency,spend,impressions,clicks,orders,attributed_sales'
+    payload = {'shop_id': shop['id'], 'source_name': 'zero-metrics.csv', 'csv_content': (
+        headers + '\n2026-10-17,C-ZERO,Zero,ENABLED,USD,0,0,0,0,0\n')}
+    imported = client.post('/api/v1/ads-reports/import', headers=auth, json=payload)
+    assert imported.status_code == 200, imported.text
+    row = client.get('/api/v1/ads-reports/campaigns', headers=auth,
+                     params={'shop_id': shop['id']}).json()['items'][0]
+    assert row['metrics'] == {
+        'ctr_percent': None, 'cpc': None, 'cvr_percent': None,
+        'acos_percent': None, 'roas': None,
+    }
+
+    missing_column = payload['csv_content'].replace(',clicks,', ',')
+    preview = client.post('/api/v1/ads-reports/preview', headers=auth, json={
+        **payload, 'csv_content': missing_column,
+    })
+    assert preview.status_code == 422
+    missing_value = payload['csv_content'].replace(',0,0,0,0,0\n', ',0,0,,0,0\n')
+    preview = client.post('/api/v1/ads-reports/preview', headers=auth, json={
+        **payload, 'csv_content': missing_value,
+    })
+    assert preview.status_code == 200, preview.text
+    assert preview.json()['error_count'] == 1
+    assert '点击量须为非负整数' in preview.json()['rows'][0]['issue']
+    assert client.post('/api/v1/ads-reports/import', headers=auth, json={
+        **payload, 'csv_content': missing_value,
+    }).status_code == 422
 
 
 def test_ads_report_import_rejects_bad_metrics_and_read_only_role(setup):

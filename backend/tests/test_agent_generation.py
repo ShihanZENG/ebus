@@ -58,7 +58,7 @@ def test_ads_zero_sales_spend_stays_in_group_total():
 def test_generation_endpoints_persist_and_customer_filters_rules(setup, monkeypatch):
     client, auth, _ = setup
     shop = client.get('/api/v1/shops', headers=auth).json()['items'][0]
-    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout:
+    monkeypatch.setattr(gen, 'completion', lambda messages, tools, timeout, **kwargs:
         {'content': '{"draft":"已记录您的反馈，引用 RULE-SIZE，建议人工核验。","citations":["RULE-SIZE"]}'
          if 'customer_message_untrusted' in messages[-1]['content'] else '基于所列数据的待审核说明。'})
     profit = client.post('/api/v1/agent-generations/profit', headers=auth, json={

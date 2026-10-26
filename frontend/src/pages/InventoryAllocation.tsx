@@ -95,8 +95,8 @@ export default function InventoryAllocation({ warehouses, skus, onChange }: { wa
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Alert type="info" showIcon message="公共库存可供各店铺使用；专属库存只供所属店铺使用。订单和调拨共用占用规则，优先分配本店专属库存。" description="已有库存保留原数量，未划分部分沿用公共口径；请先核实货主、标签和实物是否允许共用。归属调整只改变使用范围，不增加库存。" />
     <Space wrap>
-      <Select showSearch optionFilterProp="label" placeholder="选择仓库" style={{ width: 240 }} value={warehouse} onChange={setWarehouse} options={warehouses.map(r => ({ value: r.id, label: r.name }))} />
-      <Select showSearch optionFilterProp="label" placeholder="选择 SKU" style={{ width: 300 }} value={sku} onChange={setSku} options={skus.map(r => ({ value: r.id, label: `${r.code || ''} ${r.name}` }))} />
+      <Select aria-label="库存归属查询仓库" showSearch optionFilterProp="label" placeholder="选择仓库" style={{ width: 240 }} value={warehouse} onChange={setWarehouse} options={warehouses.map(r => ({ value: r.id, label: r.name }))} />
+      <Select aria-label="库存归属查询 SKU" showSearch optionFilterProp="label" placeholder="选择 SKU" style={{ width: 300 }} value={sku} onChange={setSku} options={skus.map(r => ({ value: r.id, label: `${r.code || ''} ${r.name}` }))} />
       <Button loading={loading} disabled={!warehouse || !sku} onClick={() => setRevision(v => v + 1)}>刷新</Button>
       {canWrite && <Button disabled={!data || loading} onClick={() => { form.resetFields(); setOpen(true) }}>设置店铺专属库存</Button>}
     </Space>
@@ -132,7 +132,7 @@ export default function InventoryAllocation({ warehouses, skus, onChange }: { wa
       ]} />
     </Card>}
     <Card title="未来 21 天供需日历">
-      <Space wrap style={{ marginBottom: 12 }}><span>订单业务截止日</span><DatePicker value={dayjs(businessDate)} maxDate={dayjs()} onChange={d => d && setBusinessDate(d.format('YYYY-MM-DD'))} /></Space>
+      <Space wrap style={{ marginBottom: 12 }}><span id="inventory-business-date-label">订单业务截止日</span><DatePicker aria-labelledby="inventory-business-date-label" value={dayjs(businessDate)} maxDate={dayjs()} onChange={d => d && setBusinessDate(d.format('YYYY-MM-DD'))} /></Space>
       {timelineError && <Alert type="warning" message={timelineError} />}
       {timeline && <>
         <Alert type={timeline.status === 'blocked' ? 'warning' : 'info'} showIcon message={timeline.status === 'blocked' ? '资料待补齐，暂不计算净缺口' : '按已确认订单、销量预测和预计可用日逐日计算'} description={timeline.status === 'blocked' ? timeline.issues.join('；') : timeline.note} style={{ marginBottom: 12 }} />
@@ -148,8 +148,8 @@ export default function InventoryAllocation({ warehouses, skus, onChange }: { wa
     </Card>
     <Card title="国内仓 → 海外仓的需求传递">
       <Space wrap style={{ marginBottom: 12 }}>
-        <Select placeholder="选择上游国内仓" showSearch optionFilterProp="label" style={{ width: 240 }} value={routeSource} onChange={setRouteSource} options={warehouses.filter(r => r.warehouse_type === 'domestic').map(r => ({ value: r.id, label: r.name }))} />
-        <Select placeholder="选择下游海外仓" showSearch optionFilterProp="label" style={{ width: 240 }} value={routeDestination} onChange={setRouteDestination} options={warehouses.filter(r => r.warehouse_type === 'overseas').map(r => ({ value: r.id, label: r.name }))} />
+        <Select aria-label="国内上游仓库" placeholder="选择上游国内仓" showSearch optionFilterProp="label" style={{ width: 240 }} value={routeSource} onChange={setRouteSource} options={warehouses.filter(r => r.warehouse_type === 'domestic').map(r => ({ value: r.id, label: r.name }))} />
+        <Select aria-label="海外下游仓库" placeholder="选择下游海外仓" showSearch optionFilterProp="label" style={{ width: 240 }} value={routeDestination} onChange={setRouteDestination} options={warehouses.filter(r => r.warehouse_type === 'overseas').map(r => ({ value: r.id, label: r.name }))} />
       </Space>
       {routeError && <Alert type="warning" message={routeError} />}
       {route && <>

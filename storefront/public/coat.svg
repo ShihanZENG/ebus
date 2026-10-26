@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#e7e1d4"/>
+  <g fill="#3d4a3f" opacity="0.9">
+    <path d="M210 140 L300 110 L390 140 L420 200 L370 230 L370 470 L230 470 L230 230 L180 200 Z"/>
+    <rect x="285" y="150" width="30" height="300" fill="#cfc7b5"/>
+  </g>
+  <text x="300" y="540" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#3d4a3f">WOOL COAT / 演示</text>
+</svg>

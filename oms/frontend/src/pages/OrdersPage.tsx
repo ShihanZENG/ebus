@@ -7,9 +7,11 @@ import {
 import {
   PlusOutlined, SearchOutlined, CheckOutlined, CarOutlined, CloseOutlined,
   ImportOutlined, EditOutlined, EyeOutlined, ReloadOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../api'
+import OrderLifecycle from './OrderLifecycle'
 import { useSearchParams } from 'react-router-dom'
 
 const STATUS: Record<string, { color: string; label: string }> = {
@@ -43,6 +45,18 @@ export default function OrdersPage() {
   const [editOrder, setEditOrder] = useState<any>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [batchWarehouse, setBatchWarehouse] = useState<string | undefined>()
+
+  const exportReconciliation = async () => {
+    if (!filters.date_from || !filters.date_to) { message.warning('请先选择订单日期范围'); return }
+    try {
+      const params: any = { date_from: filters.date_from, date_to: dayjs(filters.date_to).subtract(1, 'day').format('YYYY-MM-DD'), limit: 10000 }
+      if (filters.shop_id) params.shop_id = filters.shop_id
+      const { data } = await api.get('/orders/export', { params })
+      if (data.truncated) { message.warning('导出超过 10000 条，请缩小日期范围'); return }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+      const a = document.createElement('a'); a.href = url; a.download = 'oms-orders.json'; a.click(); URL.revokeObjectURL(url)
+    } catch { /* axios interceptor reports the API error */ }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -197,6 +211,7 @@ export default function OrdersPage() {
         <Space style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditOrder(null); setCreateOpen(true) }}>手动创建订单</Button>
           <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>批量导入订单</Button>
+          <Button icon={<DownloadOutlined />} onClick={exportReconciliation}>导出对账 JSON</Button>
           <Select allowClear placeholder="批量审核-履约仓库" style={{ width: 180 }} value={batchWarehouse}
             onChange={setBatchWarehouse} options={warehouses.map((w) => ({ value: w.id, label: w.name }))} />
           <Button icon={<CheckOutlined />} onClick={batchApprove}>批量审核</Button>
@@ -231,6 +246,7 @@ export default function OrdersPage() {
               <Descriptions.Item label="收件人">{detail.shipping_name} {detail.shipping_phone}</Descriptions.Item>
               <Descriptions.Item label="地址">{detail.shipping_address}, {detail.shipping_city}, {detail.shipping_state} {detail.shipping_zip}, {detail.shipping_country}</Descriptions.Item>
             </Descriptions>
+            <OrderLifecycle orderId={detail.id} />
             <Divider>商品明细</Divider>
             <Table rowKey="id" size="small" pagination={false} dataSource={detail.items}
               columns={[

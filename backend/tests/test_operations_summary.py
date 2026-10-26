@@ -44,9 +44,13 @@ def test_full_operations_summary_and_warehouse_scope(setup):
     assert inv['low_stock_items'][0]['available_qty'] == 0
     assert inv['low_stock_items'][0]['warehouse_id'] == wh['id']
     po = c.get('/api/v1/purchase-orders/summary', headers=scoped).json()
-    assert po == {'total': 102, 'by_status': {'submitted': 101, 'closed': 1}}
+    assert (po['total'], po['by_status']) == (102, {'submitted': 101, 'closed': 1})
+    assert po['data_meta']['record_count'] == 102
+    assert po['data_meta']['data_status'] == 'available'
     rep = c.get('/api/v1/replenishment-suggestions/summary', headers=scoped).json()
-    assert rep == {'pending_count': 102, 'pending_sku_count': 101}
+    assert (rep['pending_count'], rep['pending_sku_count']) == (102, 101)
+    assert rep['data_meta']['record_count'] == 104
+    assert rep['data_meta']['data_status'] == 'available'
     for path, expected_total in [('/purchase-orders', 102), ('/replenishment-suggestions', 104)]:
         listing = c.get('/api/v1' + path, headers=scoped, params={'page_size': 100}).json()
         assert listing['total'] == expected_total

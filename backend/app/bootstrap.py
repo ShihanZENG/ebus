@@ -6,6 +6,7 @@ from .db import build_engine, sessions
 from . import models as m
 from .schemas import PERMISSIONS
 from .security import hash_password
+from .lim_models import LimAgent, LimTool
 
 
 def ensure(db, model, key, **values):
@@ -22,8 +23,40 @@ def bootstrap(db, username, password, demo=False):
         raise ValueError('初始化需 ERP_ADMIN_USERNAME 与至少8字符的 ERP_ADMIN_PASSWORD')
     role = ensure(db, m.Role, {'code': 'admin'}, name='系统管理员', permissions=sorted(PERMISSIONS))
     ensure(db, m.Role, {'code': 'viewer'}, name='基础资料只读', permissions=sorted(x for x in PERMISSIONS if x.endswith(':read') and x != 'audit:read'))
-    ensure(db, m.User, {'username': username}, password_hash=hash_password(password), role_id=role.id,
-           is_active=True, shop_scope=None, warehouse_scope=None)
+    admin = ensure(db, m.User, {'username': username}, password_hash=hash_password(password), role_id=role.id,
+                   is_active=True, shop_scope=None, warehouse_scope=None)
+    operations_tool_id = 'erp.operations.snapshot'
+    empty_object_schema = {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    ensure(db, LimTool, {'tool_id': operations_tool_id, 'version': '1.0.0-demo'},
+           owner_id=admin.id, service='erp', domain='operations', operation_kind='read',
+           risk_tier='low', timeout_ms=5000, rate_limit=None, idempotency_mode='not_applicable',
+           scope_policy={'shop': 'server_scope', 'warehouse': 'server_scope'},
+           input_schema=empty_object_schema,
+           output_schema={'type': 'object', 'properties': {'read_only': {'type': 'boolean'}},
+                          'required': ['read_only'], 'additionalProperties': False},
+           status='active')
+    agent = ensure(db, LimAgent, {'agent_id': 'business-assistant', 'version': '1'},
+                   display_name='企业经营只读助手', business_domain='operations', owner_id=admin.id,
+                   definition={
+                       'description': '内置自然语言只读任务；查询通过既有助手的受限业务工具执行。',
+                       'capability_tags': ['read-only', 'natural-language'],
+                       'input_schema': {'type': 'object', 'properties': {'goal': {'type': 'string'}},
+                                        'required': ['goal'], 'additionalProperties': False},
+                       'output_schema': {'type': 'object', 'properties': {'reply': {'type': 'string'},
+                                                                          'read_only': {'type': 'boolean'}},
+                                         'required': ['reply', 'read_only'], 'additionalProperties': False},
+                       'allowed_tools': [operations_tool_id], 'risk_tier': 'low', 'runtime_profile': 'read_only',
+                   }, status='validated')
+    agent.definition = dict(agent.definition or {})
+    allowed_tools = list(agent.definition.get('allowed_tools') or [])
+    if operations_tool_id not in allowed_tools:
+        allowed_tools.append(operations_tool_id)
+    agent.definition['allowed_tools'] = allowed_tools
+    output_schema = dict(agent.definition.get('output_schema') or {})
+    output_schema['additionalProperties'] = False
+    agent.definition['output_schema'] = output_schema
+    if agent.status == 'draft':
+        agent.status = 'validated'
     unit = ensure(db, m.Dictionary, {'kind': 'unit', 'code': 'PCS'}, name='件', is_active=True)
     cny = ensure(db, m.Dictionary, {'kind': 'currency', 'code': 'CNY'}, name='人民币', is_active=True)
     ensure(db, m.Dictionary, {'kind': 'currency', 'code': 'USD'}, name='美元', is_active=True)

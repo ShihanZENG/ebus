@@ -1,0 +1,648 @@
+对于你的 CommerceOS AI 项目，我建议把 AI 智能经营系统的菜单设计成一套真正可落地的产品，而不是每个菜单只有一个标题、一张统计卡片和一个表格。
+
+我们前面规划的 AI 智能经营系统有 12 个一级菜单。每个菜单都应该明确：**页面布局、核心功能、数据展示、用户操作、Agent 协作方式，以及最终产生的业务价值。**
+
+我建议统一采用 React + TypeScript + Ant Design 的后台设计体系，同时突出 AI 决策、证据链和业务执行能力。
+
+# 一、AI 智能经营系统的完整菜单结构
+
+<box border radius="xl" padding={3} gap={2}>
+  <row align="center" gap={2}>
+    <box background="surface-secondary" radius="md" padding={2}>
+      <icon name="brain-circuit" size="xl"/>
+    </box>
+    <box flex="1" gap={1}>
+      <title size="lg">AI 智能经营系统</title>
+      <text color="secondary" size="xs">AI Decision Center</text>
+    </box>
+  </row>
+  <divider/>
+  {#each [
+    {n:"01",name:"AI 经营驾驶舱",desc:"全局经营指标与风险总览"},
+    {n:"02",name:"AI 决策工作台",desc:"自然语言任务与跨 Agent 协作"},
+    {n:"03",name:"商品与 Listing AI",desc:"商品诊断、Listing 优化"},
+    {n:"04",name:"销售订单 AI",desc:"销售趋势、订单异常分析"},
+    {n:"05",name:"库存补货 AI",desc:"需求预测、缺货预警、补货决策"},
+    {n:"06",name:"采购供应链 AI",desc:"供应商分析、采购与交期优化"},
+    {n:"07",name:"广告增长 AI",desc:"广告诊断、投放与利润优化"},
+    {n:"08",name:"财务利润 AI",desc:"利润拆解、成本和费用诊断"},
+    {n:"09",name:"客服售后 AI",desc:"客服工单、退货原因、回复辅助"},
+    {n:"10",name:"政策合规 AI",desc:"政策知识检索与风险检查"},
+    {n:"11",name:"执行审批中心",desc:"行动方案、业务审批与执行追踪"},
+    {n:"12",name:"AI 任务历史",desc:"历史任务、报告、评测与复盘"}
+  ] as m}
+    <row key={m.n} gap={3} padding={{y:2,x:1}} align="start">
+      <text color="secondary" size="xs">{m.n}</text>
+      <box flex="1" gap={1}>
+        <text weight="medium" size="sm">{m.name}</text>
+        <text color="secondary" size="xs">{m.desc}</text>
+      </box>
+    </row>
+  {/each}
+</box>
+
+这里有一个重要的设计原则：这 12 个菜单不应该成为 12 个互相独立的 AI 聊天机器人。
+
+- **经营驾驶舱**负责发现问题。
+- **专业 AI 菜单**负责特定领域的分析与决策。
+- **AI 决策工作台**负责跨领域任务编排。
+- **执行审批中心**负责受控业务操作。
+- **AI 任务历史**负责追溯和复盘。
+
+下面逐个设计。
+
+# 二、每个菜单的具体页面设计
+
+## 01. AI 经营驾驶舱
+
+<text color="secondary" size="sm">定位：让管理者进入系统后，快速知道经营状况、风险在哪里、下一步应该做什么。</text>
+
+<AsyncImage query="enterprise AI business intelligence executive dashboard ecommerce sales profit inventory advertising KPI cards anomaly alerts charts clean light SaaS interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+<box border radius="lg" padding={3} gap={3}>
+  <row align="center" justify="between">
+    <title size="lg">经营总览</title>
+    <text color="secondary" size="xs">示例页面结构</text>
+  </row>
+  <row gap={2} wrap="wrap">
+    {#each [{t:"销售额",v:"—"},{t:"贡献利润",v:"—"},{t:"广告花费",v:"—"},{t:"库存风险",v:"—"}] as k}
+      <box border radius="md" padding={2} flex="1" minWidth="105px" gap={1}>
+        <text color="secondary" size="xs">{k.t}</text>
+        <title size="xl">{k.v}</title>
+        <text color="secondary" size="xs">待接入真实数据</text>
+      </box>
+    {/each}
+  </row>
+  <box background="surface-secondary" radius="md" padding={3} gap={2}>
+    **AI 经营洞察**
+    <text size="sm">展示经过数据验证的异常、趋势、风险及原因解释。</text>
+    <text color="secondary" size="xs">例如：广告费用增长是否伴随利润改善，需要关联广告和财务数据验证。</text>
+  </box>
+  <grid columns={2} gap={2}>
+    <grid-item>
+      <box border radius="md" padding={3} gap={1}>
+        **经营趋势**
+        <text color="secondary" size="xs">销售、利润、广告、库存时间序列</text>
+      </box>
+    </grid-item>
+    <grid-item>
+      <box border radius="md" padding={3} gap={1}>
+        **风险与待办**
+        <text color="secondary" size="xs">缺货、利润异常、订单和审批待办</text>
+      </box>
+    </grid-item>
+  </grid>
+  <box border radius="md" padding={3} gap={1}>
+    **推荐行动**
+    <text size="sm">每条建议展示问题、预期影响、优先级和“进入 AI 分析”入口。</text>
+  </box>
+</box>
+
+### 应该包含的功能
+
+1. **核心 KPI 区**：销售额、贡献利润、广告费用、订单量、库存周转、缺货风险。
+2. **经营趋势区**：日、周、月趋势，以及与上期、目标值的对比。
+3. **异常检测区**：自动识别异常波动，并展示异常幅度、影响范围和数据依据。
+4. **AI 洞察区**：解释异常的可能原因，区分已验证事实与待验证假设。
+5. **行动建议区**：将发现的问题转为 AI 决策工作台任务。
+6. **待办中心**：待审批方案、未处理风险、失败的任务和需要人工介入的事项。
+
+### Agent 如何参与
+
+由经营分析或编排 Agent 汇总各领域结果，调用销售、财务、广告和库存分析能力。驾驶舱本身不应重新实现各模块的业务计算。
+
+**业务价值：** 管理者不必逐个打开 ERP、广告、库存和财务页面，就能发现需要关注的问题。
+
+---
+
+## 02. AI 决策工作台
+
+<text color="secondary" size="sm">定位：处理复杂经营问题，协调多个 Agent 形成可执行的决策方案。</text>
+
+<AsyncImage query="enterprise multi agent AI decision workspace dashboard natural language prompt task workflow evidence panel recommendations business intelligence SaaS UI" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+建议使用前面确定的三栏式工作区。
+
+<box border radius="lg" padding={2} gap={2}>
+  <box background="surface-secondary" radius="md" padding={2}>
+    <text weight="medium" size="sm">顶部：任务名称、任务状态、时间范围、暂停和取消</text>
+  </box>
+  <row align="stretch" gap={2}>
+    <box width="26%" border radius="md" padding={2} gap={2}>
+      <text weight="medium" size="sm">左栏</text>
+      <text size="xs">任务历史</text>
+      <text size="xs">执行计划</text>
+      <text size="xs">任务步骤</text>
+      <text size="xs">上下文约束</text>
+    </box>
+    <box flex="1" border radius="md" padding={2} gap={2}>
+      <text weight="medium" size="sm">中栏</text>
+      <text size="xs">自然语言输入</text>
+      <text size="xs">任务理解摘要</text>
+      <text size="xs">Agent 协作进度</text>
+      <text size="xs">决策报告与追问</text>
+    </box>
+    <box width="26%" border radius="md" padding={2} gap={2}>
+      <text weight="medium" size="sm">右栏</text>
+      <text size="xs">数据证据</text>
+      <text size="xs">影响评估</text>
+      <text size="xs">风险与约束</text>
+      <text size="xs">审批入口</text>
+    </box>
+  </row>
+</box>
+
+### 核心功能
+
+- 自然语言任务创建。
+- 任务意图和约束解析。
+- 任务计划预览与确认。
+- 多 Agent 并行和依赖流程展示。
+- 证据与数据口径查看。
+- 多方案比较。
+- 任务暂停、取消、恢复和重新运行。
+- 报告导出、后续追问和转交审批。
+
+### 必须重点设计的交互
+
+用户输入：
+
+“分析未来 14 天可能断货的商品，在不超过可用采购预算的情况下给出补货方案，暂时不要下单。”
+
+系统应先生成任务摘要和计划，再调用销售预测、库存、采购和财务分析能力。
+
+最终结果不是一段普通文本，而是一份包含 SKU、建议数量、采购成本、预计到货时间、缺货风险、数据依据和约束检查结果的方案。
+
+**业务价值：** 将跨系统的人工分析流程，变成统一、可追溯、可审批的经营决策流程。
+
+---
+
+## 03. 商品与 Listing AI
+
+<text color="secondary" size="sm">定位：提升商品数据质量、Listing 内容质量和商品经营表现。</text>
+
+<AsyncImage query="ecommerce product catalog management AI listing optimization dashboard product images attributes SEO quality score professional admin interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+- **顶部指标区**：商品总量、待完善属性、Listing 质量问题、待审核优化建议。
+- **左侧商品筛选**：品牌、类目、SKU、店铺、市场、状态。
+- **中间商品列表**：商品图片、SKU、标题、价格、库存、质量评分和异常标签。
+- **右侧商品详情**：商品属性、Listing 内容、数据来源、AI 诊断和修改前后对比。
+
+### 子功能设计
+
+| 子功能 | 页面内容 | AI 能力 |
+|---|---|---|
+| 商品质量检查 | 缺失属性、重复 SKU、规格冲突 | 属性完整性检测 |
+| Listing 诊断 | 标题、五点描述、图片、关键词 | 内容质量分析 |
+| Listing 优化 | 原文、修改建议、差异对比 | 文案生成与优化 |
+| 商品表现分析 | 点击、转化、退货、利润 | 表现异常诊断 |
+| 多市场适配 | 不同站点的语言和属性要求 | 本地化与规则检查 |
+| 优化任务管理 | 待生成、待审核、已发布 | 版本和任务追踪 |
+
+### 页面上的关键操作
+
+- 查看商品原始数据。
+- 生成优化建议。
+- 比较修改前后版本。
+- 检查内容是否符合当前适用的市场规则。
+- 保存草稿、提交审核、通过授权接口发布。
+- 回看发布后的表现变化。
+
+**技术重点：** 商品基础信息以 ERP 为权威来源；AI 生成的内容必须经过 Schema 校验和必要的规则检查，不能自动覆盖正式商品数据。
+
+**业务价值：** 降低商品信息维护成本，减少数据错误，提升商品内容质量。
+
+---
+
+## 04. 销售订单 AI
+
+<text color="secondary" size="sm">定位：发现销售趋势变化，识别订单异常并解释原因。</text>
+
+<AsyncImage query="ecommerce sales analytics order management AI anomaly detection dashboard sales trends order status breakdown filters clean enterprise interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+顶部放置销售额、订单量、平均订单金额、取消率和异常订单等指标。
+
+中间分成两部分：
+
+- 左侧：销售趋势、商品排名、市场与渠道对比。
+- 右侧：异常订单、销售波动解释和 AI 分析结果。
+
+底部提供订单列表，支持进入 OMS 查看和处理真实订单。
+
+### 子功能
+
+1. 销售趋势分析：日、周、月、同比和环比。
+2. 商品销售诊断：销量、销售额、毛利与退货率。
+3. 订单异常检测：异常金额、状态不一致、重复订单。
+4. 销售变化归因：价格、流量、转化、库存和渠道因素。
+5. 需求预测：输出预测区间和误差指标。
+6. 订单风险分析：履约风险、取消风险和异常积压。
+
+### Agent 的分工
+
+Sales Agent 负责销售数据分析，Fulfillment Agent 负责履约异常，Finance Agent 核验销售与利润口径。
+
+**业务价值：** 更早发现销售下滑和订单履约问题，并把分析结果传递给库存、广告和财务模块。
+
+---
+
+## 05. 库存补货 AI
+
+<text color="secondary" size="sm">定位：预测缺货风险、优化补货数量，并平衡供应保障与库存资金占用。</text>
+
+<AsyncImage query="inventory replenishment planning dashboard stock coverage days demand forecast purchase recommendations SKU risk table enterprise SaaS" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+顶部：缺货风险 SKU 数、低库存商品、积压库存金额、在途采购金额。
+
+中间：库存风险分布图、需求预测曲线、库存覆盖趋势。
+
+底部：SKU 补货决策表。
+
+| SKU | 当前可用库存 | 预测需求 | 建议采购量 | 预计到货 | 风险 |
+|---|---:|---:|---:|---|---|
+| 示例 SKU A | 待取数 | 待预测 | 待计算 | 待核实 | 待评估 |
+| 示例 SKU B | 待取数 | 待预测 | 待计算 | 待核实 | 待评估 |
+
+以上表格是界面结构示例，不是实际库存数据。
+
+### 子功能
+
+- 库存健康度分析。
+- 安全库存和库存覆盖天数计算。
+- 缺货与积压预警。
+- 需求预测与补货建议。
+- 在途库存和采购交期分析。
+- 多仓库存分配建议。
+- 补货情景模拟。
+- 补货方案转采购草稿。
+
+### 决策逻辑
+
+补货量不应由 LLM 直接生成，而应综合需求预测、可用库存、预留库存、在途数量、交期、安全库存、采购批量和预算进行计算。
+
+AI 负责解释原因、选择分析路径和比较方案；确定性业务服务负责计算与约束校验。
+
+**业务价值：** 减少缺货损失和库存积压，改善库存周转和现金占用。
+
+---
+
+## 06. 采购供应链 AI
+
+<text color="secondary" size="sm">定位：在供应商、交期、成本、质量和资金约束之间寻找更优的采购方案。</text>
+
+<AsyncImage query="procurement supplier comparison dashboard purchase order planning lead time cost quality risk enterprise procurement management UI" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+- **采购概览**：待采购需求、待审批采购、供应商风险、延迟交付。
+- **供应商对比**：报价、MOQ、交期、质量记录、历史准时率。
+- **采购计划**：SKU、需求量、建议采购量、供应商、成本和预计到货日期。
+- **风险分析**：供应商集中度、交期不确定性、成本变化。
+- **采购方案详情**：方案比较、预算校验、审批和执行记录。
+
+### 子功能
+
+1. 供应商评分和对比。
+2. 采购价格趋势分析。
+3. 供应商交期预测。
+4. 采购量和采购批次优化。
+5. 采购预算与资金占用分析。
+6. 供应链风险预警。
+7. 采购单草稿生成。
+8. 采购执行后的交期与质量复盘。
+
+### Agent 协作
+
+Inventory Agent 提供补货需求，Procurement Agent 计算采购方案，Finance Agent 检查预算，Risk Agent 检查供应风险。
+
+正式创建采购单时，必须调用 ERP 的采购服务，并执行权限校验、幂等控制和审批规则。
+
+**业务价值：** 减少人工询价和方案比较时间，提升采购成本、交期和供应稳定性。
+
+---
+
+## 07. 广告增长 AI
+
+<text color="secondary" size="sm">定位：将广告优化从单纯追求流量和 ROAS，提升到考虑利润、库存和业务目标的综合决策。</text>
+
+<AsyncImage query="digital advertising performance analytics dashboard campaign spend ACOS ROAS keyword performance optimization enterprise SaaS" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+顶部：广告花费、广告销售额、ACOS、ROAS、广告贡献利润。
+
+中间：
+
+- 左侧：广告趋势、Campaign 表现、关键词表现。
+- 右侧：异常诊断、AI 优化建议、预算变化模拟。
+
+底部：Campaign 与关键词明细表。
+
+### 子功能
+
+- 广告 Campaign 分析。
+- 关键词与搜索词诊断。
+- 高花费低转化识别。
+- ACOS、ROAS 与利润联合分析。
+- 广告预算分配模拟。
+- 关键词优化建议。
+- 广告与库存联动分析。
+- 广告策略草稿、审批和执行结果核验。
+
+### 关键业务规则
+
+不能只因为 ROAS 下降就建议降低预算。
+
+例如，某个商品广告效率下降，但库存充足且自然销售也在增长，和某个商品广告花费上升、利润为负且即将缺货，是两种完全不同的经营情境。
+
+Ads Agent 应与 Finance Agent、Inventory Agent 协作，在明确目标利润、预算上限和库存约束后生成方案。
+
+**业务价值：** 降低无效广告支出，改善广告投入产出，同时避免损害整体销售和利润。
+
+---
+
+## 08. 财务利润 AI
+
+<text color="secondary" size="sm">定位：解释利润变化、发现费用异常，提供有证据支持的经营财务分析。</text>
+
+<AsyncImage query="ecommerce financial analytics dashboard profit margin revenue cost breakdown waterfall chart reconciliation expense variance professional finance SaaS UI" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+- 顶部：销售额、毛利、贡献利润、利润率、费用率。
+- 中间左侧：利润趋势和利润瀑布图。
+- 中间右侧：成本结构、费用异常和变化归因。
+- 底部：利润明细、对账差异和 AI 分析报告。
+
+### 子功能
+
+1. 利润变化归因。
+2. 商品级贡献利润分析。
+3. 广告、物流、采购及其他费用拆解。
+4. 退款、退货和费用异常分析。
+5. 结算差异和对账辅助。
+6. 利润预测和情景模拟。
+7. 预算与利润目标检查。
+8. 财务异常追踪与复核记录。
+
+### 必须注意的实现细节
+
+财务 Agent 不应该自行发明利润公式。利润计算应使用统一的业务口径，例如明确销售额、退款、商品成本、广告费、平台费和物流费是否计入目标指标。
+
+AI 可以解释利润为何变化，但实际金额应来自可追溯的财务计算服务和业务记录。
+
+**业务价值：** 将“利润下降了多少”进一步转化为“为什么下降、哪个因素可控、改善后可能产生什么影响”。
+
+---
+
+## 09. 客服售后 AI
+
+<text color="secondary" size="sm">定位：提高客服处理效率，识别售后问题的共性原因。</text>
+
+<AsyncImage query="AI customer support ecommerce ticket management dashboard return reasons response suggestions order lookup clean professional SaaS interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+采用左侧工单列表、中间工单详情、右侧 AI 辅助面板。
+
+工单列表展示状态、优先级、订单号、问题类别和等待时长。
+
+中间显示用户问题、历史对话、订单与物流信息。
+
+右侧显示 AI 生成的回复草稿、知识库依据、退款政策和建议处理方式。
+
+### 子功能
+
+- 客服工单分类与优先级排序。
+- 订单、物流和退款信息查询。
+- 回复草稿生成。
+- 售后政策检索。
+- 退货和退款原因分析。
+- 客诉升级预警。
+- 商品质量问题归因。
+- 客服处理效果分析。
+
+### 权限边界
+
+AI 默认只生成回复草稿和处理建议。正式发送消息、批准退款或改变订单状态，应依据用户权限、业务规则和具体风险执行。
+
+**业务价值：** 降低重复查询与回复成本，帮助发现商品质量、物流和产品说明中的系统性问题。
+
+---
+
+## 10. 政策合规 AI
+
+<text color="secondary" size="sm">定位：帮助运营团队查找、理解和检查适用的市场政策与业务规则。</text>
+
+<AsyncImage query="compliance knowledge management dashboard policy document search source citations risk assessment review workflow enterprise software interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+- 顶部：待复核风险、政策更新、待审核内容。
+- 左侧：市场、平台、政策类别、更新时间和适用范围筛选。
+- 中间：政策文档检索和原文内容。
+- 右侧：AI 摘要、适用条件、风险解释和引用来源。
+- 底部：受影响商品、任务和复核记录。
+
+### 子功能
+
+1. 政策与规则知识库。
+2. 自然语言政策检索。
+3. 政策摘要和条款对比。
+4. Listing 内容合规检查。
+5. 商品属性和市场要求检查。
+6. 政策更新影响分析。
+7. 风险任务创建与复核。
+8. 政策版本和引用记录管理。
+
+### 技术重点
+
+每个结论都应能查看原始条款、来源、版本、发布时间或生效日期，以及适用范围。
+
+如果政策来源不完整、版本不明确或适用条件不确定，应显示需要复核，而不是直接给出确定的合规结论。
+
+**业务价值：** 减少人工检索政策的时间，降低错误发布内容和忽略规则变更的风险。
+
+---
+
+## 11. 执行审批中心
+
+<text color="secondary" size="sm">定位：将 AI 的建议安全地转化为正式业务操作。</text>
+
+<AsyncImage query="enterprise approval workflow center pending purchase advertising budget change requests before after diff audit trail approval dashboard" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+顶部展示待我审批、待执行、执行失败和近期完成的操作。
+
+中间采用审批列表：
+
+| 字段 | 作用 |
+|---|---|
+| 任务名称 | 对应的 AI 决策任务 |
+| 操作类型 | 采购、广告、商品、订单等 |
+| 发起人 | 用户或授权业务流程 |
+| 风险等级 | 根据操作类型和业务规则确定 |
+| 变更摘要 | 修改前后差异 |
+| 审批状态 | 待审批、已通过、已拒绝 |
+| 执行状态 | 未执行、执行中、成功、失败 |
+
+点击某一条记录后进入审批详情页。
+
+### 审批详情必须包含
+
+- 业务目标与方案来源。
+- 具体修改内容和修改前后对比。
+- 数据证据与计算结果。
+- 预算、库存和业务规则检查。
+- 执行影响与不可逆风险提示。
+- 审批人、审批意见和时间。
+- 执行返回结果及业务记录 ID。
+- 失败处理和可用的回滚或补偿方式。
+
+### 操作流程
+
+<box border radius="lg" padding={3} gap={2} align="center">
+  <box border radius="md" padding={3} width="100%" align="center">
+    **AI 生成行动方案**
+  </box>
+  <icon name="arrow-down" color="secondary"/>
+  <box border radius="md" padding={3} width="100%" align="center">
+    **权限与业务规则检查**
+  </box>
+  <icon name="arrow-down" color="secondary"/>
+  <box background="surface-secondary" radius="md" padding={3} width="100%" align="center">
+    **有权限的用户审批**
+  </box>
+  <icon name="arrow-down" color="secondary"/>
+  <box border radius="md" padding={3} width="100%" align="center">
+    **授权执行器调用 ERP / OMS / 外部 API**
+  </box>
+  <icon name="arrow-down" color="secondary"/>
+  <box border radius="md" padding={3} width="100%" align="center">
+    **回读业务状态并记录执行结果**
+  </box>
+</box>
+
+审批必须绑定明确的变更内容版本。如果审批后方案发生改变，应重新进行必要的校验和审批，不能用一次审批授权任意后续变更。
+
+**业务价值：** 让 AI 从“提出建议”真正走向“协助执行”，同时保留业务责任、权限边界和审计能力。
+
+---
+
+## 12. AI 任务历史
+
+<text color="secondary" size="sm">定位：统一管理过去执行过的 AI 任务、报告、决策方案和执行结果。</text>
+
+<AsyncImage query="AI task history management dashboard execution runs reports filters status duration cost trace details enterprise SaaS interface" aspectRatio="16:9" width="100%"/>
+
+### 页面布局
+
+顶部提供搜索、日期范围、任务类型、发起人和状态筛选。
+
+中间显示任务表格：
+
+| 字段 | 说明 |
+|---|---|
+| 任务名称 | 用户问题或任务摘要 |
+| 任务类型 | 诊断、预测、优化、执行 |
+| 关联 Agent | 参与任务的 Agent |
+| 创建时间 | 任务创建时间 |
+| 完成状态 | 成功、部分成功、失败、已取消 |
+| 耗时 | 任务执行时长 |
+| 成本 | 可追踪的模型和工具调用成本 |
+| 业务结果 | 报告、方案、审批或执行记录 |
+
+点击任务后进入历史详情，能够恢复当时的任务范围、计划版本、Agent 运行记录、证据、决策方案和审批结果。
+
+### 子功能
+
+- 任务检索和筛选。
+- 历史报告查看和导出。
+- Agent 执行轨迹查询。
+- 失败任务诊断。
+- 历史任务重跑。
+- 方案执行结果复盘。
+- 评测案例沉淀。
+- 任务模板创建。
+
+### 技术重点
+
+历史任务重跑不应该默认重复执行过去的写操作。
+
+建议将重跑分为：
+
+- **重新分析**：使用当前数据重新运行只读分析。
+- **按原版本回放**：使用已保存的输入和版本复现任务。
+- **重新执行操作**：重新校验当前数据、权限和审批，不直接复用历史执行授权。
+
+**业务价值：** 将一次性 AI 分析沉淀成可复用的经营知识和可持续评测的案例。
+
+---
+
+# 三、所有菜单应该共用哪些基础组件？
+
+上面 12 个菜单虽然业务不同，但应共享一套统一的 AI 交互组件，避免每个页面都重新实现一次。
+
+<box border radius="lg" padding={3} gap={3}>
+  {#each [
+    {n:"AI 任务入口",d:"从当前商品、订单、SKU 或报表直接发起有上下文的分析任务。"},
+    {n:"AI 洞察卡片",d:"显示结论、证据、影响、置信度说明和下一步操作。"},
+    {n:"证据详情抽屉",d:"查看来源系统、记录、统计口径、查询时间与计算过程。"},
+    {n:"Agent 运行状态",d:"统一展示排队、运行、等待、成功、失败和取消状态。"},
+    {n:"方案对比组件",d:"统一展示不同方案的成本、收益、约束、风险和差异。"},
+    {n:"审批与执行组件",d:"展示变更差异、权限检查、审批进度与真实执行结果。"},
+    {n:"任务历史面板",d:"查看关联任务、历史分析、执行记录和后续复盘。"}
+  ] as c}
+    <row key={c.n} gap={3} align="start">
+      <box background="surface-secondary" size="36px" radius="md" align="center" justify="center">
+        <icon name="component" size="lg"/>
+      </box>
+      <box flex="1" gap={1}>
+        <text weight="medium">{c.n}</text>
+        <text color="secondary" size="sm">{c.d}</text>
+      </box>
+    </row>
+  {/each}
+</box>
+
+例如，用户在库存补货 AI 中发现某个 SKU 有断货风险，点击“跨模块分析”后，应该直接进入 AI 决策工作台，并自动带上 SKU、店铺、日期范围和当前证据。
+
+这样用户不必重新描述问题，工作台也不必重复查询已经获取的数据；但执行前仍然需要重新检查数据是否过期以及权限是否有效。
+
+# 四、我建议实际开发时采用的优先级
+
+如果你希望尽快把系统做成可以真实演示、逐步接入生产业务的产品，不建议一次性开发完全部 12 个菜单。
+
+| 优先级 | 菜单 | 首要交付内容 |
+|---|---|---|
+| P0 | AI 经营驾驶舱 | 核心指标、异常和 AI 分析入口 |
+| P0 | AI 决策工作台 | 任务创建、编排、证据、报告 |
+| P0 | 库存补货 AI | 缺货分析、补货方案与约束验证 |
+| P0 | 财务利润 AI | 统一利润口径、利润变化归因 |
+| P1 | 广告增长 AI | 广告诊断与利润联动分析 |
+| P1 | 采购供应链 AI | 供应商、采购草稿和审批流程 |
+| P1 | 执行审批中心 | 权限校验、审批和执行记录 |
+| P1 | AI 任务历史 | 任务追踪、复盘和重跑 |
+| P2 | 商品与 Listing AI | 商品质量与内容优化 |
+| P2 | 销售订单 AI | 销售诊断与履约风险 |
+| P2 | 客服售后 AI | 工单辅助和售后分析 |
+| P2 | 政策合规 AI | 政策检索、规则检查和引用 |
+
+这里的 P0/P1/P2 是建议的实施顺序，并不意味着其他模块不重要。具体顺序应结合你目前已经完成的 Agent、ERP 数据接口和业务服务来调整。
+
+**最终我最建议你优先打通一条完整链路：**
+
+AI 经营驾驶舱发现利润异常 → AI 决策工作台协调销售、广告、库存和财务 Agent → 生成有证据的改善方案 → 执行审批中心控制业务变更 → AI 任务历史验证实际经营效果。
+
+只要这条链路真正可运行，你的 AI 智能经营系统就不再只是多个 AI 功能菜单的集合，而是一套能够连接企业数据、业务决策和实际执行的经营平台。

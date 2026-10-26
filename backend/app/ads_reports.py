@@ -7,11 +7,12 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select, tuple_
 
 from . import models as m
 from .security import record_audit, require, session_db
+from .provenance import utc_iso
 
 router = APIRouter(prefix='/ads-reports', tags=['广告报表'])
 
@@ -28,11 +29,19 @@ INTEGER_PATTERN = re.compile(r'^\d+$')
 
 
 class AdsReportInput(BaseModel):
-    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    model_config = ConfigDict(extra='forbid')
 
     shop_id: str = Field(min_length=36, max_length=36)
     source_name: str = Field(min_length=1, max_length=255)
     csv_content: str = Field(min_length=1, max_length=MAX_CSV_LENGTH)
+
+    @field_validator('shop_id', 'source_name')
+    @classmethod
+    def strip_metadata_fields(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError('来源文件名不能为空')
+        return value
 
 
 class AdsDiagnosticSettingInput(BaseModel):
@@ -209,11 +218,14 @@ def _validated_rows(db, user, payload):
     return rows
 
 
-def _batch_snapshot(row):
+def _batch_snapshot(row, actor_name=None):
     return {
         'id': row.id,
         'shop_id': row.shop_id,
+        'actor_id': row.actor_id,
+        'actor_name': actor_name,
         'source_name': row.source_name,
+        'content_hash': row.content_hash,
         'row_count': row.row_count,
         'inserted_count': row.inserted_count,
         'corrected_count': row.corrected_count,
@@ -254,7 +266,8 @@ def import_report(payload: AdsReportInput, db=Depends(session_db), user=Depends(
         m.AdsReportBatch.content_hash == content_hash,
     ))
     if existing_batch:
-        result = _batch_snapshot(existing_batch)
+        existing_actor = db.get(m.User, existing_batch.actor_id)
+        result = _batch_snapshot(existing_batch, existing_actor.username if existing_actor else None)
         result['idempotent'] = True
         return result
 
@@ -350,7 +363,7 @@ def import_report(payload: AdsReportInput, db=Depends(session_db), user=Depends(
         'currencies': currencies,
     })
     db.commit()
-    result = _batch_snapshot(batch)
+    result = _batch_snapshot(batch, user.username)
     result.update({'idempotent': False, 'unchanged_count': unchanged})
     return result
 
@@ -372,11 +385,30 @@ def list_campaigns(shop_id: str | None = None, date_from: date | None = None, da
     if date_to:
         conditions.append(m.AdsCampaignDaily.report_date <= date_to)
     total = db.scalar(select(func.count()).select_from(m.AdsCampaignDaily).where(*conditions))
+    latest_batch = db.execute(
+        select(m.AdsReportBatch.created_at, m.AdsReportBatch.source_name)
+        .select_from(m.AdsCampaignDaily)
+        .join(m.AdsReportBatch, m.AdsReportBatch.id == m.AdsCampaignDaily.latest_batch_id)
+        .where(*conditions)
+        .order_by(m.AdsReportBatch.created_at.desc(), m.AdsReportBatch.id.desc())
+        .limit(1)
+    ).first()
+    data_meta = {
+        'source': 'ads_report_import',
+        'source_mode': 'file_import',
+        'data_status': 'available' if total else 'missing',
+        'record_count': int(total or 0),
+        'last_record_updated_at': utc_iso(latest_batch[0] if latest_batch else None),
+        'last_record_update_semantics': '最新报表导入批次 created_at；不是广告平台同步时间',
+        'source_name': latest_batch[1] if latest_batch else None,
+        'sample_status': 'unclassified',
+    }
     rows = db.scalars(select(m.AdsCampaignDaily).where(*conditions)
                       .order_by(m.AdsCampaignDaily.report_date.desc(), m.AdsCampaignDaily.campaign_name)
                       .offset((page - 1) * page_size).limit(page_size)).all()
     if not rows:
-        return {'items': [], 'total': total, 'page': page, 'page_size': page_size}
+        return {'items': [], 'total': total, 'page': page, 'page_size': page_size,
+                'data_meta': data_meta}
 
     action_keys = [(row.shop_id, row.report_date, row.campaign_id, row.currency) for row in rows]
     actions = db.scalars(select(m.AdsCampaignAction).where(tuple_(
@@ -440,6 +472,7 @@ def list_campaigns(shop_id: str | None = None, date_from: date | None = None, da
         'campaign_status': row.campaign_status, 'currency': row.currency,
         'spend': str(row.spend), 'impressions': row.impressions, 'clicks': row.clicks,
         'orders': row.orders, 'attributed_sales': str(row.attributed_sales),
+        'metrics': _campaign_metrics(row),
         'sku_code': row.sku_code, 'latest_batch_id': row.latest_batch_id,
         'action_status': (action_by_key[(row.shop_id, row.report_date, row.campaign_id, row.currency)].action_status
                           if (row.shop_id, row.report_date, row.campaign_id, row.currency) in action_by_key else 'pending'),
@@ -460,7 +493,8 @@ def list_campaigns(shop_id: str | None = None, date_from: date | None = None, da
             sku_mapped=row.sku_code in mapped_sku_by_code,
         ),
     } for row in rows]
-    return {'items': items, 'total': total, 'page': page, 'page_size': page_size}
+    return {'items': items, 'total': total, 'page': page, 'page_size': page_size,
+            'data_meta': data_meta}
 
 
 @router.put('/campaign-actions')
@@ -510,6 +544,26 @@ def save_campaign_action(payload: AdsCampaignActionInput, db=Depends(session_db)
 
 
 LOCAL_LOW_STOCK_THRESHOLD = 120
+
+
+def _safe_ratio(numerator, denominator, multiplier=1):
+    if numerator is None or denominator is None:
+        return None
+    numerator = Decimal(str(numerator))
+    denominator = Decimal(str(denominator))
+    if denominator <= 0:
+        return None
+    return float(numerator * Decimal(str(multiplier)) / denominator)
+
+
+def _campaign_metrics(row):
+    return {
+        'ctr_percent': _safe_ratio(row.clicks, row.impressions, 100),
+        'cpc': _safe_ratio(row.spend, row.clicks),
+        'cvr_percent': _safe_ratio(row.orders, row.clicks, 100),
+        'acos_percent': _safe_ratio(row.spend, row.attributed_sales, 100),
+        'roas': _safe_ratio(row.attributed_sales, row.spend),
+    }
 
 
 def _campaign_diagnostics(row, no_sales_threshold, target_acos, local_available_qty, *, sku_mapped):
@@ -632,8 +686,9 @@ def list_batches(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le
         conditions.append(m.AdsReportBatch.shop_id.in_(user.shop_scope) if user.shop_scope
                           else m.AdsReportBatch.shop_id == '')
     total = db.scalar(select(func.count()).select_from(m.AdsReportBatch).where(*conditions))
-    rows = db.scalars(select(m.AdsReportBatch).where(*conditions)
-                      .order_by(m.AdsReportBatch.created_at.desc(), m.AdsReportBatch.id)
-                      .offset((page - 1) * page_size).limit(page_size)).all()
-    return {'items': [_batch_snapshot(row) for row in rows], 'total': total,
+    rows = db.execute(select(m.AdsReportBatch, m.User.username).join(
+        m.User, m.User.id == m.AdsReportBatch.actor_id).where(*conditions)
+        .order_by(m.AdsReportBatch.created_at.desc(), m.AdsReportBatch.id)
+        .offset((page - 1) * page_size).limit(page_size)).all()
+    return {'items': [_batch_snapshot(row, actor_name) for row, actor_name in rows], 'total': total,
             'page': page, 'page_size': page_size}

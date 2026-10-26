@@ -11,6 +11,8 @@
 
 主系统账号来自本地 `backend/.env`；独立 OMS 账号使用本地初始化配置。请勿将真实账号、密码或密钥提交到版本库。
 
+主系统登录后从企业工作区入口进入已授权的 ERP 或 AI 工作区。点击“独立 OMS”会在新窗口打开 `http://127.0.0.1:3001/login`，使用 OMS 账号独立登录；入口不会传递 ERP 凭据，也不自动授予 OMS 权限。
+
 独立 OMS 前端默认端口为 `3001`，端口占用时会自动顺延（例如 http://127.0.0.1:3002/login），请以启动日志为准。主系统和独立 OMS 分别启动，独立 OMS 的启动步骤见 [OMS README](./oms/README.md)。
 
 ## 文档入口
@@ -28,6 +30,7 @@
 - [ERP 功能章节与逐篇写作提示词](./docs/功能章节/README.md)
 - [OMS 订单管理功能文档](./docs/oms/README.md)
 - [AI 总助手与多 Agent 目标架构](./docs/AI总助手与多Agent目标架构.md)
+- [LIM 能力盘点与首批边界](./docs/lim/g0-capability-inventory.md)：按 PRD LIM-FR-001–024 对照当前实现、证据和后续阶段。
 - [后端启动与接口使用](./backend/README.md)
 - [ERP 后端设计](./docs/ERP后端设计.md)
 - [后端交付说明](./docs/ERP后端交付说明.md)

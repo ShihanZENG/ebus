@@ -25,11 +25,12 @@ def _tokens(text):
     return result
 
 
-def _read_chunks(path, relative):
-    try:
-        text = path.read_text(encoding='utf-8')
-    except (OSError, UnicodeError):
-        return []
+def _read_chunks(path, relative, text=None):
+    if text is None:
+        try:
+            text = path.read_text(encoding='utf-8')
+        except (OSError, UnicodeError):
+            return []
     chunks = []
     section = path.stem
     buffer = []
@@ -102,55 +103,9 @@ KNOWLEDGE_TOOLS = [{
 
 
 def search_knowledge(db, user, args):
-    """词面检索本地审核文档。db/user 参数与助手工具接口保持一致。"""
-    query = str((args or {}).get('query', '')).strip()[:300]
-    query_tokens = _tokens(query)
-    if len(query_tokens) < 1:
-        raise ValueError('知识检索需要关键词')
-    corpus = _corpus()
-    document_tokens = [
-        _tokens(f"{chunk['path']}\n{chunk['section']}\n{chunk['text']}") for chunk in corpus
-    ]
-    document_frequency = {}
-    for tokens in document_tokens:
-        for token in tokens:
-            document_frequency[token] = document_frequency.get(token, 0) + 1
-    idf = {token: math.log(1 + (len(corpus) - count + 0.5) / (count + 0.5))
-           for token, count in document_frequency.items()}
-    query_weight = sum(idf.get(token, 0.0) for token in query_tokens) or 1.0
-    normalized_query = re.sub(r'\s+', '', query.casefold())
-    candidates = []
-    for chunk, doc_tokens in zip(corpus, document_tokens):
-        overlap = query_tokens & doc_tokens
-        if not overlap:
-            continue
-        # Rare query terms carry more weight; a contiguous phrase is a strong precision signal.
-        score = sum(idf.get(token, 0.0) for token in overlap) / query_weight
-        searchable = re.sub(r'\s+', '', f"{chunk['path']} {chunk['section']} {chunk['text']}").casefold()
-        if normalized_query and normalized_query in searchable:
-            score += 0.35
-        candidates.append((score, chunk))
-    candidates.sort(key=lambda row: (-row[0], row[1]['path'], row[1]['start_line']))
-    items = []
-    for index, (score, chunk) in enumerate(candidates[:5], 1):
-        ref_id = f'K{index}'
-        items.append({
-            'ref_id': ref_id,
-            'path': chunk['path'],
-            'section': chunk['section'],
-            'start_line': chunk['start_line'],
-            'end_line': chunk['end_line'],
-            'excerpt': chunk['text'],
-            'relevance': round(score, 4),
-        })
-    return {
-        'source': '项目本地审核文档（关键词检索）',
-        'query': query,
-        'retrieval': 'lexical',
-        'limitations': ['仅搜索 docs/功能章节 与 docs/oms 下的 Markdown 文件，不是语义向量检索或联网搜索。',
-                        '检索片段用于辅助解释；业务状态、库存和权限以实时业务查询工具为准。'],
-        'items': items,
-    }
+    """检索当前用户有权访问的已登记本地 Markdown 知识快照。"""
+    from .lim_knowledge import search_registered_knowledge
+    return search_registered_knowledge(db, user, (args or {}).get('query', ''))
 
 
 KNOWLEDGE_TOOL_FUNCTIONS = {'search_knowledge': search_knowledge}

@@ -3,6 +3,7 @@
 from sqlalchemy import or_, select
 
 from . import models as m
+from .common import allowed as _allowed
 from .listings import Listing
 from .security import role_for
 
@@ -22,11 +23,6 @@ PRODUCT_TOOLS = [
         },
     }
 ]
-
-
-def _allowed(db, user, permission):
-    role = role_for(db, user)
-    return bool(role and (role.code == 'admin' or permission in (role.permissions or [])))
 
 
 def _unavailable(permission):

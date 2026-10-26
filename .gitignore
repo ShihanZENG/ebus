@@ -27,3 +27,22 @@ outputs/
 lab/
 tools/_frontend_calls.json
 tools/_frontend_calls.txt
+
+# 后端自愈守护日志
+supervise.log
+
+.workbuddy-ai/
+
+
+**/.vite-cache*/
+**/dist-verify/
+storefront/.backup-*/
+storefront/.patch-*.cjs
+
+# 临时探针/草稿脚本（下划线前缀）与本地导出数据，禁止入库
+backend/_*.py
+backend/*.json
+!backend/package.json
+!backend/*.config.json
+frontend/_*.mjs
+

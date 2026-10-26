@@ -1,0 +1,60 @@
+# LIM 网关 V1.1 运行说明
+
+## 本次能力
+
+- `/api/v1/lim/model-calls` 与 `/model-metrics` 使用同一可见性规则：普通用户仅本人记录；管理员、`lim:manage` 或 `audit:read` 可以查看全局记录。仍需要 `assistant:read`。
+- 管理调试接口仍需要 `lim:manage` 和 `assistant:read`；配额、频率、并发拒绝返回 HTTP 429，治理存储故障返回 503。
+- 所有走 `completion` / 网关 `complete` 的业务模型调用共享治理；缺少 actor 的内部调用归入统一系统桶，不能绕过配额。供应商连通性检查是管理员诊断接口，不属于业务调用配额。
+- 路由优先级保持精确场景优先、随后通配场景。仅启用且 ACTIVE 的供应商和启用路由可用。临时错误优先尝试下一候选，无其他候选时有限重试。仅默认别名完全未注册时兼容旧环境配置。
+- 408/429/500/502/503/504、网络故障和超时可以重试；鉴权、参数、无效响应不重试。默认最多两次，退避 100ms，所有网络尝试共用调用方时间预算。底层 HTTP 整体交换可取消，不能保证供应商停止已经接收的计算或计费。
+- 每条最终记录包含 scene 和 attempts（供应商、模型、状态、HTTP 状态码、耗时、已知 Token），不含密钥、提示词和供应商响应正文。
+- 页面展示近七天可见调用、成功率、已知用量、用量不完整调用、平均耗时、治理模式与限额。重试成功不会掩盖前一次失败尝试的未知用量。
+
+## 配置与默认值
+
+| 环境变量 | 默认值 | 含义 |
+|---|---|---|
+| LIM_REDIS_URL | 空 | 空值为单进程内存；设置后所有实例必须指向同一 Redis |
+| LIM_REQUESTS_PER_MINUTE | 60 | 每身份每 UTC 固定分钟的调用准入次数 |
+| LIM_MAX_CONCURRENCY | 3 | 每身份同时进行的模型请求数 |
+| LIM_DAILY_TOKEN_BUDGET | 1000000 | 每身份每天的保守 Token 预留预算 |
+| LIM_MAX_ATTEMPTS | 2 | 单请求最多模型尝试，允许 1–3 |
+| LIM_CIRCUIT_THRESHOLD | 3 | 供应商+模型连续临时错误阈值 |
+| LIM_CIRCUIT_SECONDS | 30 | 熔断及错误累计的过期窗口 |
+
+模型配置仍复用已有供应商和别名管理。调整环境变量后重启后端。
+
+## 预算口径与故障行为
+
+每天 UTC 00:00（北京时间 08:00）重置。按 UTF-8 请求大小加协议余量与最大输出长度估算单次 Token，再为最大尝试次数一起预留。已知供应商用量按实际结算；发出但结果未知的尝试保留估算额，未执行的尝试退回额度。进程崩溃后并发租约会到期，但已预留额度不会凭空退回。结算带租约身份且幂等，重复结算不再次退款。
+
+这是一套保守预算控制，不是精确计费或数学上绝不超额的模型 Token 上限。不同供应商隐藏推理用量或分词方式可能超过估算；实际用量超过预留时记入预算，后续调用被拒绝。费用未知保持未知。
+
+Redis 原子脚本完成检查和预留，避免多实例并发超卖同一额度。配置 Redis 后连接故障拒绝新调用，不静默退回本机内存。结算失败保留预留额并记录告警。Redis 数据应持久化且采用 noeviction；管理员清库或丢失持久化数据会重置预算。内存模式仅供单实例演示，重启会重置，不能用于多实例共享配额。
+
+## 部署
+
+先备份现有数据库。在 `backend` 目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+docker compose -p crossborder-erp up -d redis
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+本地 compose 只在 127.0.0.1:16379 暴露 Redis。需要共享治理时，在本地 `.env` 设置 `LIM_REDIS_URL=redis://127.0.0.1:16379/0`，然后重启后端。不要复制示例文件覆盖已有密钥。
+
+本工作区的本地演示服务已于 2026-10-26 实际启用上述 Redis 配置：迁移前备份为 `backend/backups/erp_pre_lim_v11_20261026_111326.dump`（681,262 字节）；Redis healthcheck 为 healthy；Alembic `/ready` 报告 revision `0047`；后端重启后，管理员鉴权访问 `/api/v1/lim/model-metrics` 返回 HTTP 200、治理模式 `redis`、60 次/分钟、并发 3、日预算 1,000,000 Token。没有发送模型请求。
+
+新增迁移 0047 仅为调用表添加 scene 和 attempts，历史记录默认场景 `*`、空尝试数组。它接在当前工作区已有的 0046 后；发布时必须携带完整迁移链。
+
+## 验证与已知边界
+
+测试使用隔离 SQLite 数据库、模拟供应商响应及临时真实 Redis，无真实模型费用。专项覆盖越权记录、并发预留、重复结算、窗口切换、Redis 断连、备用模型优先级、熔断、HTTP 取消及日志脱敏。
+
+- 网络尝试总期限不包含同步数据库审计/额度结算的等待，不能称为整个接口响应的严格截止时间。
+- 独立审计沿用现有事务设计；SQLite 外层业务写事务可能锁住审计写入。失败会输出 `LIM_MODEL_AUDIT_WRITE_FAILED`；不是保证零丢失的审计队列。
+- 缓存、价格表、费用硬预算、多租户及写工具审批未实施；通用工具强制中止仍属后续工作。
+- 本轮保留用户现有 storefront/navigation 改动，不自动提交混合工作区。
+
+技术依据：[Redis 原子脚本](https://redis.io/docs/latest/develop/programmability/eval-intro/)、[HTTPX 超时语义](https://www.python-httpx.org/advanced/timeouts/)。

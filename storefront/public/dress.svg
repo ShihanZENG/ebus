@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#e3dde2"/>
+  <g fill="#4a3b4d" opacity="0.9">
+    <path d="M255 150 L345 150 L375 210 L355 230 L355 470 L245 470 L245 230 L225 210 Z"/>
+    <path d="M255 150 L300 185 L345 150" fill="none" stroke="#4a3b4d" stroke-width="8"/>
+  </g>
+  <text x="300" y="540" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#4a3b4d">SLIP DRESS / 演示</text>
+</svg>

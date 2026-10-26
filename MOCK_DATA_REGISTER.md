@@ -1,0 +1,19 @@
+# Mock、硬编码与模拟实现清单
+
+本清单区分**数据库中的演示业务记录**、**仅用于视觉预览的前端常量**和**完全没有外部服务的模拟流程**。数据库中的测试订单不会因为带 `demo` 标记就变成前端 Mock。
+
+| 项目 | 类型 / 生效条件 | 实际行为与风险 | 证据 |
+| --- | --- | --- | --- |
+| Storefront 视觉商品 | 前端硬编码，仅 Vite 开发构建且 URL 带 `?preview=1` | 四款概念商品及“可用 10 件”来自数组；预览模式阻止结账。正常模式从公共商品 API 读取数据库。 | [storefront/src/main.tsx:52](storefront/src/main.tsx#L52)、[storefront/src/main.tsx:54](storefront/src/main.tsx#L54)、[storefront/src/main.tsx:219](storefront/src/main.tsx#L219)、[storefront/src/main.tsx:377](storefront/src/main.tsx#L377) |
+| Storefront 视觉图、首页故事与政策 | 静态资源和 JSX 固定文案 | 图片、口号、帮助说明及政策演示稿不取业务数据库；公司联系字段部分来自站点 API。不能当成真实商品、公司或正式消费者政策。 | [storefront/src/main.tsx:442](storefront/src/main.tsx#L442)、[storefront/src/main.tsx:485](storefront/src/main.tsx#L485)、[storefront/src/main.tsx:487](storefront/src/main.tsx#L487) |
+| 购物车与本会话订单列表 | 浏览器 `sessionStorage`，不是服务端购物车或账户 | 购物车总价按本地单价计算；提交时后端重新验证价格版本与库存。订单详情本身从真实主库查询，但本会话列表依赖本地保存的访问 token。 | [storefront/src/main.tsx:61](storefront/src/main.tsx#L61)、[storefront/src/main.tsx:78](storefront/src/main.tsx#L78)、[storefront/src/cart.mjs:7](storefront/src/cart.mjs#L7)、[storefront/src/main.tsx:273](storefront/src/main.tsx#L273)、[backend/app/storefront/service.py:146](backend/app/storefront/service.py#L146) |
+| Storefront 运费、税费与支付状态 | 演示常量 | `shipping_amount='0.00'`、`payment_status='not_charged'`；前端显示 £0.00 且说明未计算真实税费。没有实际网关扣款或回调。 | [backend/app/storefront/service.py:49](backend/app/storefront/service.py#L49)、[backend/app/storefront/service.py:113](backend/app/storefront/service.py#L113)、[storefront/src/main.tsx:482](storefront/src/main.tsx#L482) |
+| Storefront 站点编号、币种和履约边界 | 后端固定演示约束 | `site()` 查询固定 `zhijian-uk`，要求 GBP 店铺/仓库；不是多租户可配置商城的通用契约。站点元数据和商品记录仍存数据库。 | [backend/app/storefront/service.py:28](backend/app/storefront/service.py#L28)、[backend/app/storefront/service.py:49](backend/app/storefront/service.py#L49)、[backend/app/storefront/models.py:7](backend/app/storefront/models.py#L7) |
+| ERP 初始化示例 | 可选 `bootstrap(..., demo=True)` | 合成商品/SKU 用于本地测试；隔离探针用它建立主商品后再单独入库 10 件。 | [backend/app/bootstrap.py:21](backend/app/bootstrap.py#L21)、[backend/app/bootstrap.py:43](backend/app/bootstrap.py#L43)、[docs/audit/flow_audit_probe.py](docs/audit/flow_audit_probe.py) |
+| 独立 OMS 种子数据 | `app.seed` 显式初始化 | 创建演示商品、库存、订单、付款和售后记录；不能用它们证明 Storefront 下单已经同步至独立 OMS。 | [oms/backend/app/seed.py:173](oms/backend/app/seed.py#L173)、[oms/backend/app/seed.py:238](oms/backend/app/seed.py#L238)、[oms/backend/app/seed.py:249](oms/backend/app/seed.py#L249) |
+| 主库付款记录 `simulated` | 明确标记的数据库模拟记录 | 可以通过员工 API 写入，但不是银行/支付网关确认。隔离运行重复提交生成 2 条记录。 | [backend/app/schemas.py:237](backend/app/schemas.py#L237)、[backend/app/orders.py:589](backend/app/orders.py#L589)、[E2E_TEST_REPORT.md](E2E_TEST_REPORT.md) |
+| 独立 OMS 付款记录 | 人工登记的数据库记录 | `add_payment` 写 PaymentRecord；未见网关签名回调或自动认款路径。种子记录标注“演示收款”。 | [oms/backend/app/orders.py:626](oms/backend/app/orders.py#L626)、[oms/backend/app/seed.py:238](oms/backend/app/seed.py#L238) |
+| LIM Sandbox | 明确的 Mock Tool 响应路径 | 接收调用者给的 `mock_response`，记录 `mocked=True`，不调用工具 handler；不能作为订单/库存集成验证。 | [backend/app/lim_sandbox.py:1](backend/app/lim_sandbox.py#L1)、[backend/app/lim_sandbox.py:65](backend/app/lim_sandbox.py#L65)、[backend/app/lim_sandbox.py:75](backend/app/lim_sandbox.py#L75) |
+| 商城状态页 | 单接口探测 | 只检查站点 API 是否可响应；页面自身也说明不能代表支付、库存或物流状态。 | [storefront/src/main.tsx:289](storefront/src/main.tsx#L289)、[storefront/src/main.tsx:488](storefront/src/main.tsx#L488) |
+
+**真实数据库数据的边界：** 正常商品 API 查 Storefront 发布表并关联 ERP 商品/SKU；可售库存实时取 ERP 库存归属；结账真实写主库订单；消费者查单真实读主库订单和出库状态。[backend/app/storefront/routes.py:185](backend/app/storefront/routes.py#L185)、[backend/app/storefront/service.py:53](backend/app/storefront/service.py#L53)、[backend/app/storefront/service.py:132](backend/app/storefront/service.py#L132)、[backend/app/storefront/service.py:76](backend/app/storefront/service.py#L76)

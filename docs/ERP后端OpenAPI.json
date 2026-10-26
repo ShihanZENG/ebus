@@ -3949,6 +3949,16 @@
               }
             }
           }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseOrderReject"
+              }
+            }
+          }
         }
       }
     },
@@ -6783,6 +6793,22 @@
           "updated_at"
         ],
         "title": "WarehouseRead"
+      },
+      "PurchaseOrderReject": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 480,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "PurchaseOrderReject"
       }
     },
     "securitySchemes": {

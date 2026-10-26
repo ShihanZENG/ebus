@@ -4,9 +4,10 @@
 
 ## 本机访问
 
-采购 Agent 新版详见 [上线步骤与补充数据](../docs/采购Agent开发/08_上线能力与补充数据.md)。迁移升至0008；配置真实模型后使用 /api/v1/purchase-agent/chat；未配置可使用 /supply-decide 规则分析。先补齐报价有效期、合规依据、订单业务时间/数据完整范围及仓库物流配置。模型配置值存于本地 .env，示例见 .env.example。
+采购 Agent 详见 [上线步骤与补充数据](../docs/采购Agent开发/08_上线能力与补充数据.md)。该阶段最初由迁移 0008 引入；当前启动应执行 `alembic upgrade head`，应用仓库内全部后续迁移。配置真实模型后使用 /api/v1/purchase-agent/chat；未配置可使用 /supply-decide 规则分析。先补齐报价有效期、合规依据、订单业务时间/数据完整范围及仓库物流配置。模型配置值存于本地 .env，示例见 .env.example。
 
 - 接口文档：http://127.0.0.1:18080/docs
+- 企业门户：登录后访问 http://127.0.0.1:15173/workspace
 - OpenAPI：http://127.0.0.1:18080/openapi.json
 - 存活检查：http://127.0.0.1:18080/health
 - 数据库就绪检查：http://127.0.0.1:18080/ready
@@ -51,6 +52,8 @@ docker compose -p crossborder-erp up -d db
 | 分组 | 路径 | 能力 |
 | --- | --- | --- |
 | 身份 | /api/v1/auth/login、me、logout | 登录、当前身份、退出 |
+| 企业门户 | /api/v1/portal/workspaces | 按当前角色返回 ERP/AI 工作区；OMS 保持不可点击状态，直到独立身份授权接入 |
+| LIM 运行治理 | /api/v1/lim/* | Agent/Tool 版本注册与校验、只读 Run/Trace、固定 Golden Dataset 评测；写操作 Tool 不进入运行时 |
 | 账号 | /api/v1/users、users/{id}、users/{id}/password | 分页查询、新建、角色与范围修改、启停用、密码重置 |
 | 角色 | /api/v1/roles、roles/{id}、permissions | 查询、新建、权限修改、可用权限清单 |
 | 商品 | /api/v1/products | 商品资料 |
@@ -99,7 +102,7 @@ docker compose -p crossborder-erp up -d db
 - 会话默认有效 8 小时。数据库只保存 token 摘要，密码使用随机盐 PBKDF2-SHA256（600000 轮）。同一已知账号连续失败 5 次锁定 5 分钟。
 - 全局操作日志仅允许同时具有审计权限和全店铺、全仓库范围的账号查看。
 - 币种和单位引用按类型校验。新建或切换引用需要启用资料；历史引用仍可读取。
-- 时间戳在数据库按 UTC 保存。店铺时区保存为 IANA 名称。当前未实现金额、库存或交易单据。
+- 时间戳在数据库按 UTC 保存。店铺时区保存为 IANA 名称。订单、收付款、库存和采购单据已实现；具体能力与限制见上方接口分组及各业务说明。
 
 ## 验证
 
@@ -110,8 +113,23 @@ docker compose -p crossborder-erp up -d db
 
 默认测试使用临时 SQLite 文件并逐个执行迁移，不触碰演示库。PostgreSQL 验证通过 TEST_DATABASE_URL 指定连接，每例建立随机隔离 schema，并在结束时删除该 schema；需要相应 schema 权限。不要把生产数据库作为测试目标。
 
+## LIM 首批能力
+
+LIM 首批迁移版本为 `0028`（当前数据库可能继续应用后续迁移）。执行 `alembic upgrade head` 后可在前端“LIM 运行治理”页面使用。运行时仅连接服务端明确配置的只读适配器；当前不提供生产写执行、模型密钥管理、语义质量判定或自动发布能力。评测报告会固定数据集与 Agent 版本，语义质量指标标记为 `NOT_EVALUATED`。固定版本比较复用已有 Eval Run，提供本地确定性断言差异、逐例回归分类、报告级阈值与规范化 SHA-256 校验；它不代表真实模型效果，也不构成生产发布门禁。
+
+LIM 知识源目录由迁移 `0031` 创建。管理员在“知识源”页首次执行同步，将仅扫描 `docs/功能章节` 和 `docs/oms` 下的本地 Markdown；首次导入版本直接生效，后续内容变更生成待审核版本，需管理员激活。缺失文件对应的历史快照会保留，管理员可归档来源。知识读取与检索要求 `assistant:read`，来源还可附加既有角色权限作为 ACL；元数据和生命周期变更写入审计日志。`POST /api/v1/lim/knowledge/search` 与助手工具共用已登记快照检索，采用词面匹配并返回稳定来源/版本/片段引用，不提供向量语义检索或联网搜索。
+
+G3 Workflow 基础由迁移 `0033` 建立。`/api/v1/lim/workflows` 管理版本化只读 DAG，版本校验会固定 Agent/Tool 版本、检查依赖无环及只读 handler；`POST /api/v1/lim/workflow-runs` 按调用人当前 Scope 建立父 Run，并为节点建立可追溯子 Run/Trace。首版支持有界并行、JSON Pointer 参数映射、声明式条件与 Join、日期范围约束、取消标记、部分失败和证据汇总。只有业务证据显式给出 `comparison_key` 或 `comparable_group` 才参与一致性/冲突判定；缺少声明时保留原始 ref 而不比较。调度在单进程同步执行，不提供进程重启恢复或多实例 worker 保证。
+
+G4 Skill 治理基础由迁移 `0034` 创建。`/api/v1/lim/skills` 仅登记带来源、证据、范围、校验记录和有效期的候选版本；owner 可在 `CANDIDATE` 阶段用 `PUT /api/v1/lim/skills/{skill_id}/versions/{version}` 补齐受控元数据，进入审核后锁定；`/api/v1/lim/skills/{skill_id}/versions/{version}/transition` 依据受控状态机审核、验证、激活、冻结或撤销。状态改变与新版本激活均写审计，激活前要求证据和有效期，单个 Skill 同时最多一个 active 版本。当前 Skill 定义是惰性治理数据，不会自动进入提示词、长期 Memory 或 Runtime；使用和纠错计数没有可信运行时来源时保持为 0。该交付只覆盖 LIM-FR-015 的治理基础，不表示 Temporal GraphRAG、长期记忆召回或 Skill 运行时已实现。
+
+G4 Sandbox 由迁移 `0035` 增加 Run `execution_mode`（既有 Run 默认为 `live`）。`POST /api/v1/lim/sandbox/runs` 只校验固定版本的 Agent/Tool Schema 并记录操作者提供的 Mock 响应，不读取或调用任何 Tool handler；Scope 固定为空，预算固定为一个调用/5 秒，Evidence refs 为空。Sandbox 对参数/Mock response 按支持的 JSON Schema 约束校验；数组须声明 `items`，未知 Schema 关键字 fail closed。Trace/Run/审计只保存参数和响应的结构/类型摘要，原始 scalar 内容不持久化或回显，避免自定义字段中的业务/个人数据泄漏。该隔离是应用内无 handler 的仿真路径，不是容器或进程隔离，FR-022 仍需部署级控制验证。
+
 ## 外部资料的使用
 
 已有 ERP 文档服务器地址为 https://47.107.76.124/lingxing-erp；工作区知识库文档给出的 data-lab 地址为 https://47.107.76.124/data-lab。
 
 本批只参考本地文档，未登录或写入远程服务。现有 ERP 是独立模拟系统，包含大量交易与数据平台能力。本地后端提供本期最小契约，使用 /api/v1 前缀、分页与行级范围设计，但不声称与远程接口完全兼容。远程数据导入作为后续独立工作。
+
+
+G4 LIM 本地运行告警由迁移 `0036` 创建。`/api/v1/lim/alerts` 提供按操作者可见范围查询；默认规则为 Agent 失败 3 次/10 分钟、Tool 超时 2 次/10 分钟、Workflow 编排级失败 3 次/10 分钟，可由具备 `lim:manage` 与 `assistant:read` 的管理员调整。告警按规则与 Agent/Tool/Workflow 维度去重，支持确认、关闭、关闭后重新累计阈值再打开，并审计规则及状态变更。Sandbox、取消、预执行拒绝和已由子 Run 记录的 Workflow 失败不进入父级阈值；告警不复制目标、参数、响应、异常文本或 Trace 内容。当前同步 handler 只能在返回后判定超时，无法中断仍阻塞的调用；邮件、Slack、PagerDuty 和值班通知未配置，FR-024 仍未达到生产验收。

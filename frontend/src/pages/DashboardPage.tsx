@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { request } from '../api/client'
 import { loadNameMap } from '../api/lookups'
 import { useAuth } from '../auth/AuthProvider'
+import DataProvenance, { type DataMeta } from '../components/DataProvenance'
 
 interface Order {
   id: string
@@ -38,16 +39,19 @@ interface InventorySummary {
   low_stock_count: number
   low_stock_threshold: number
   low_stock_items: InventoryRow[]
+  data_meta: DataMeta
 }
 
 interface PurchaseSummary {
   total: number
   by_status: Record<string, number>
+  data_meta: DataMeta
 }
 
 interface ReplenishmentSummary {
   pending_count: number
   pending_sku_count: number
+  data_meta: DataMeta
 }
 
 interface DictRow {
@@ -59,6 +63,7 @@ interface OrderSummary {
   total: number
   by_status: Record<string, number>
   by_currency: { currency_id: string; code: string; amount: string }[]
+  data_meta: DataMeta
 }
 
 interface FinanceCurrencyRow {
@@ -77,6 +82,7 @@ interface FinanceCurrencyRow {
 interface FinanceSummary {
   by_currency: FinanceCurrencyRow[]
   definitions: Record<string, string>
+  data_meta: DataMeta
 }
 
 const ORDER_STATUS: Record<string, { text: string; color: string }> = {
@@ -185,7 +191,11 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>业务总览</Typography.Title>
-          <Typography.Text type="secondary">跨境电商运营数据与待办事项</Typography.Text>
+          <Space size={8} wrap>
+            <Typography.Text type="secondary">跨境电商运营数据与待办事项</Typography.Text>
+            <Tag color="blue">ERP 本地业务记录</Tag>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>不代表平台实时同步；广告报表来源与导入时间见广告管理</Typography.Text>
+          </Space>
         </div>
         <Space wrap>
           {can('orders:read') && <Typography.Link onClick={() => navigate('/orders')}>查看订单</Typography.Link>}
@@ -202,6 +212,13 @@ export default function DashboardPage() {
         订单按授权店铺、库存与采购补货按授权仓库全量统计。仓库可用库存为在库减预留；低库存按仓库与SKU组合计数，待补货SKU去重计数。明细仅展示部分记录。
       </Typography.Text>
       {error && <Alert type="error" showIcon message={error} />}
+
+      <Row gutter={[12, 0]}>
+        {orderSummary && <Col xs={24} xl={12}><DataProvenance title="订单指标" meta={orderSummary.data_meta} /></Col>}
+        {inventorySummary && <Col xs={24} xl={12}><DataProvenance title="库存指标" meta={inventorySummary.data_meta} /></Col>}
+        {purchaseSummary && <Col xs={24} xl={12}><DataProvenance title="采购指标" meta={purchaseSummary.data_meta} /></Col>}
+        {replenishmentSummary && <Col xs={24} xl={12}><DataProvenance title="补货指标" meta={replenishmentSummary.data_meta} /></Col>}
+      </Row>
 
       <Row gutter={[16, 16]}>
         {cards.map((c) => (
@@ -230,6 +247,7 @@ export default function DashboardPage() {
 
       {can('finance_agent:read') && can('orders:read') && can('payment_records:read') && can('after_sales:read') &&
         <Card title="分币种收款与费用对账" loading={loading}>
+          <DataProvenance title="财务指标" meta={financeSummary?.data_meta} />
           {!financeSummary ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="财务对账汇总暂不可用" /> :
             <Table
               size="small"

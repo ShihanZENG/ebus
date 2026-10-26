@@ -307,3 +307,23 @@ def test_replenishment_convert_once(setup):
     assert again.status_code == 409
     sug_now = client.get(f'/api/v1/replenishment-suggestions/{sug_id}', headers=auth).json()
     assert sug_now['status'] == 'turned_into_po'
+
+
+def test_purchase_rejection_requires_and_retains_reason(setup):
+    client, auth, _ = setup
+    supplier, warehouse, sku = demo_scm(client, auth)
+    po = create_po(client, auth, supplier, warehouse, sku, qty=3)
+    assert client.post(f"/api/v1/purchase-orders/{po['id']}/submit", headers=auth).status_code == 200
+
+    blank = client.post(f"/api/v1/purchase-orders/{po['id']}/reject", headers=auth, json={'reason': '   '})
+    assert blank.status_code == 422
+    rejected = client.post(f"/api/v1/purchase-orders/{po['id']}/reject", headers=auth,
+                           json={'reason': '供应商交期无法满足订单'} )
+    assert rejected.status_code == 200, rejected.text
+    assert rejected.json()['status'] == 'rejected'
+    detail = client.get(f"/api/v1/purchase-orders/{po['id']}", headers=auth).json()
+    assert '供应商交期无法满足订单' in detail['remark']
+    audits = client.get('/api/v1/audit-logs', headers=auth,
+                        params={'resource': 'purchase_orders', 'record_id': po['id']}).json()['items']
+    reject_audit = next(row for row in audits if row['action'] == 'reject')
+    assert '供应商交期无法满足订单' in reject_audit['after']['remark']

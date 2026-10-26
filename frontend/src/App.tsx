@@ -3,6 +3,16 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import AiOpsOverviewPage from './pages/aiops/AiOpsOverviewPage'
+import AiOpsCopilotPage from './pages/aiops/AiOpsCopilotPage'
+import AiOpsCopilotAnalysisPage from './pages/aiops/AiOpsCopilotAnalysisPage'
+import AiOpsAgentWorkbenchPage from './pages/aiops/AiOpsAgentWorkbenchPage'
+import AiOpsAgentCollabDetailPage from './pages/aiops/AiOpsAgentCollabDetailPage'
+import AiOpsEffectOverviewPage from './pages/aiops/AiOpsEffectOverviewPage'
+import AiOpsEffectReviewPage from './pages/aiops/AiOpsEffectReviewPage'
+import AiOpsTaskHistoryPage from './pages/aiops/AiOpsTaskHistoryPage'
+import AiOpsStrategyTemplatesPage from './pages/aiops/AiOpsStrategyTemplatesPage'
+import AiCapabilityHubPage from './pages/aiops/AiCapabilityHubPage'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Orders from './pages/Orders'
@@ -42,16 +52,25 @@ import FbaInventoryPage from './pages/FbaInventoryPage'
 import FbaReconciliationPage from './pages/FbaReconciliationPage'
 import FbaOverseasPlansPage from './pages/FbaOverseasPlansPage'
 import FbaLabelPrintingPage from './pages/FbaLabelPrintingPage'
-import AssistantPage from './pages/AssistantPage'
+import AssistantEntryPage from './pages/AssistantEntryPage'
 import ProductAgentPage from './pages/ProductAgentPage'
 import OperationsAgentPage from './pages/OperationsAgentPage'
 import CustomerAgentPage from './pages/CustomerAgentPage'
+import WorkspacePage from './pages/WorkspacePage'
+import LimConsolePage from './pages/LimConsolePage'
+import LimReplenishmentPage from './pages/LimReplenishmentPage'
+import OmsReconciliationPrepPage from './pages/OmsReconciliationPrepPage'
+import AdGrowthAIPage from './pages/AdGrowthAIPage'
+import ProfitFinanceAIPage from './pages/ProfitFinanceAIPage'
+import DecisionCenterPage from './pages/DecisionCenterPage'
 import { useAuth } from './auth/AuthProvider'
 import { NAV_PERMISSION } from './config/menu'
 
 function Guard({ children }: { children: ReactNode }) {
-  const { token, ready } = useAuth()
-  if (!ready) {
+  const { token, ready, booting } = useAuth()
+  // 首次会话校验未结束，或 DEV 自动登录进行中：显示校验中，不跳转登录页，
+  // 避免自动登录尚未完成的瞬间被弹到 /login。
+  if (!ready || booting) {
     return <div style={{ padding: 40, color: '#8c8c8c' }}>正在校验登录状态…</div>
   }
   if (!token) return <Navigate to="/login" replace />
@@ -68,6 +87,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/workspace" element={<Guard><WorkspacePage /></Guard>} />
       <Route
         path="/"
         element={
@@ -76,17 +96,47 @@ export default function App() {
           </Guard>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="ai-assistant" element={<PermissionGuard permission={NAV_PERMISSION['ai-assistant']}><AssistantPage /></PermissionGuard>} />
+        <Route index element={<Navigate to="/workspace" replace />} />
+        <Route path="dashboard" element={<Guard><DashboardPage /></Guard>} />
+        <Route path="ai-dashboard" element={<PermissionGuard permission={NAV_PERMISSION['ai-dashboard']}><AiOpsOverviewPage /></PermissionGuard>} />
+        <Route path="lim-console" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="overview" /></PermissionGuard>} />
+        <Route path="lim-agent-runtime" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="agentRuntime" /></PermissionGuard>} />
+        <Route path="lim-tool-registry" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="toolRegistry" /></PermissionGuard>} />
+        <Route path="lim-workflow" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="workflow" /></PermissionGuard>} />
+        <Route path="lim-runs" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="runs" /></PermissionGuard>} />
+        <Route path="lim-alerts" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="alerts" /></PermissionGuard>} />
+        <Route path="lim-eval" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="eval" /></PermissionGuard>} />
+        <Route path="lim-knowledge" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="knowledge" /></PermissionGuard>} />
+        <Route path="lim-skills" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="skills" /></PermissionGuard>} />
+        <Route path="lim-model-gateway" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="modelGateway" /></PermissionGuard>} />
+        <Route path="lim-safety" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="security" /></PermissionGuard>} />
+        <Route path="lim-replenishment" element={<PermissionGuard permission="purchase_agent:read"><LimReplenishmentPage /></PermissionGuard>} />
+        <Route path="oms-reconciliation-prep" element={<PermissionGuard permission="orders:read"><OmsReconciliationPrepPage /></PermissionGuard>} />
+        <Route path="ai-assistant" element={<PermissionGuard permission={NAV_PERMISSION['ai-assistant']}><AssistantEntryPage /></PermissionGuard>} />
+        <Route path="ai-task-history" element={<PermissionGuard permission={NAV_PERMISSION['ai-task-history']}><AiOpsTaskHistoryPage /></PermissionGuard>} />
+        <Route path="ai-copilot" element={<PermissionGuard permission={NAV_PERMISSION['ai-copilot']}><AiOpsCopilotPage /></PermissionGuard>} />
+        <Route path="ai-copilot-analysis" element={<PermissionGuard permission={NAV_PERMISSION['ai-copilot-analysis']}><AiOpsCopilotAnalysisPage /></PermissionGuard>} />
+        <Route path="ai-agent-workbench" element={<PermissionGuard permission={NAV_PERMISSION['ai-agent-workbench']}><AiOpsAgentWorkbenchPage /></PermissionGuard>} />
+        <Route path="ai-agent-collab/:id" element={<PermissionGuard permission={NAV_PERMISSION['ai-agent-collab']}><AiOpsAgentCollabDetailPage /></PermissionGuard>} />
+        <Route path="ai-effect-overview" element={<PermissionGuard permission={NAV_PERMISSION['ai-effect-overview']}><AiOpsEffectOverviewPage /></PermissionGuard>} />
+        <Route path="ai-effect/:id" element={<PermissionGuard permission={NAV_PERMISSION['ai-effect']}><AiOpsEffectReviewPage /></PermissionGuard>} />
+        <Route path="ai-strategy-templates" element={<PermissionGuard permission={NAV_PERMISSION['ai-strategy-templates']}><AiOpsStrategyTemplatesPage /></PermissionGuard>} />
+        <Route path="ai-capability" element={<PermissionGuard permission={NAV_PERMISSION['ai-capability']}><AiCapabilityHubPage /></PermissionGuard>} />
         <Route path="product-agent" element={<PermissionGuard permission={NAV_PERMISSION['product-agent']}><ProductAgentPage /></PermissionGuard>} />
         <Route path="operations-agent" element={<PermissionGuard permission={NAV_PERMISSION['operations-agent']}><OperationsAgentPage /></PermissionGuard>} />
         <Route path="customer-agent" element={<PermissionGuard permission={NAV_PERMISSION['customer-agent']}><CustomerAgentPage /></PermissionGuard>} />
-        <Route path="datalab" element={<Dashboard />} />
+        <Route path="ad-growth" element={<PermissionGuard permission={NAV_PERMISSION['ad-growth']}><AdGrowthAIPage /></PermissionGuard>} />
+        <Route path="profit-finance" element={<PermissionGuard permission={NAV_PERMISSION['profit-finance']}><ProfitFinanceAIPage /></PermissionGuard>} />
+        <Route path="datalab" element={<Guard><Dashboard /></Guard>} />
         <Route path="ad-campaigns" element={<PermissionGuard permission={NAV_PERMISSION['ad-campaigns']}><AdCampaignsPage /></PermissionGuard>} />
-        <Route path="finance-settlements" element={<FinanceSettlementsPage />} />
-        <Route path="statistics" element={<StatisticsPage />} />
-        {/* 商品中心（ERP） */}
+        <Route path="finance-settlements" element={<Guard><FinanceSettlementsPage /></Guard>} />
+        <Route path="statistics" element={<Guard><StatisticsPage /></Guard>} />
+        {/* AI 智能经营：任务工作台详情（带 :taskId） */}
+        <Route path="ai/tasks/:taskId" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
+        <Route path="ai-risk-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage /></PermissionGuard>} />
+        <Route path="ai-strategy-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
+        <Route path="ai-approval-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
+        <Route path="ai-execution-center" element={<PermissionGuard permission="purchase_agent:read"><DecisionCenterPage initialTab="tasks" /></PermissionGuard>} />
         <Route path="products" element={<PermissionGuard permission={NAV_PERMISSION.products}><Products /></PermissionGuard>} />
         <Route path="skus" element={<PermissionGuard permission={NAV_PERMISSION.skus}><Products /></PermissionGuard>} />
         <Route path="listings" element={<PermissionGuard permission={NAV_PERMISSION.listings}><ListingsPage /></PermissionGuard>} />

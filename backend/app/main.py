@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Query, Request
@@ -32,9 +33,19 @@ from .generation_reviews import router as generation_reviews_router
 from .profit_reconciliation import router as profit_reconciliation_router
 from .channels import router as channels_router
 from .assistant import router as assistant_router
+from .assistant_tasks import router as assistant_tasks_router
 from .product_agent import router as product_agent_router
 from .operations_agent import router as operations_agent_router
 from .listing_agent import router as listing_agent_router
+from .portal import router as portal_router
+from .lim_routes import router as lim_router
+from .reconciliation_prep import router as reconciliation_prep_router
+from .oms_routing import router as oms_routing_router
+from .oms_exceptions import router as oms_exceptions_router
+from .oms_fulfilment import router as oms_fulfilment_router
+from .oms_rules import router as oms_rules_router
+from .lim_errors import LimRuntimeError
+from .decision_center import router as decision_center_router
 from . import supply_agent_llm  # noqa: F401 - 注册模型路由
 from . import supply_readiness  # noqa: F401 - 注册SKU资料检查
 from . import sales_coverage_evidence  # noqa: F401 - 注册来源凭证复核
@@ -63,6 +74,10 @@ def create_app(engine=None, *, storefront_enabled=False):
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
         return JSONResponse(status_code=exc.status_code, content={'error': {'code': f'HTTP_{exc.status_code}', 'message': exc.detail}}, headers=exc.headers)
+
+    @app.exception_handler(LimRuntimeError)
+    async def lim_runtime_error(request, exc):
+        return JSONResponse(status_code=exc.status_code, content={'error': {'code': exc.code, 'message': exc.message}})
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
@@ -121,6 +136,9 @@ def create_app(engine=None, *, storefront_enabled=False):
         db.commit()
 
     app.include_router(auth)
+    app.include_router(decision_center_router)
+    app.include_router(lim_router)
+    app.include_router(portal_router)
     admin = APIRouter(prefix='/api/v1', tags=['账号与角色'])
 
     def role_result(role):
@@ -249,9 +267,11 @@ def create_app(engine=None, *, storefront_enabled=False):
     app.include_router(profit_reconciliation_router)
     app.include_router(channels_router)
     app.include_router(assistant_router)
+    app.include_router(assistant_tasks_router)
     app.include_router(product_agent_router)
     app.include_router(operations_agent_router)
     app.include_router(listing_agent_router)
+    app.include_router(reconciliation_prep_router)
 
     @app.get('/api/v1/audit-logs', tags=['操作日志'])
     def logs(actor_id: str | None = None, resource: str | None = None,
@@ -273,4 +293,8 @@ def create_app(engine=None, *, storefront_enabled=False):
     return app
 
 
-app = create_app()
+# Storefront is a demo-branded feature (single 'zhijian-uk' GBP site). Enable it on
+# the main ERP app so /api/storefront/v1/* and /api/v1/storefront/* are served from
+# the real `erp` database instead of returning 404. Toggle via STOREFRONT_ENABLED.
+STOREFRONT_ENABLED = os.getenv('STOREFRONT_ENABLED', 'false').lower() in ('1', 'true', 'yes', 'on')
+app = create_app(storefront_enabled=STOREFRONT_ENABLED)

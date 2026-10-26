@@ -104,7 +104,7 @@ export default function ProductAgentPage() {
 
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <div>
-      <Typography.Title level={4} style={{ margin: 0 }}>商品 Agent</Typography.Title>
+      <Typography.Title level={4} style={{ margin: 0 }}>商品与 Listing AI</Typography.Title>
       <Typography.Text type="secondary">商品、SKU、本地 Listing 映射、当前供货关系与仓库库存综合查询。</Typography.Text>
     </div>
     <Alert type="info" showIcon message="只读商品助手" description="按商品/SKU、Listing、供应关系、库存各自的读取权限与店铺/仓库范围返回结果。Listing 为本地映射，不代表平台实时状态；供货价是当前记录，不是历史报价。" />

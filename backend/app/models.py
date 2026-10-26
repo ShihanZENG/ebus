@@ -225,6 +225,10 @@ class SalesOrder(Record, Base):
     source_order_no: Mapped[str] = mapped_column(String(120))
     ordered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default='draft', index=True)
+    # OMS 三维状态（权威）：legacy status 仅作派生兼容字段，由 oms_state 统一维护。
+    order_status: Mapped[str] = mapped_column(String(20), default='created', index=True)      # created/confirmed/cancelled/completed
+    payment_status: Mapped[str] = mapped_column(String(24), default='unpaid', index=True)     # unpaid/pending/paid/partially_refunded/refunded
+    fulfillment_status: Mapped[str] = mapped_column(String(24), default='unallocated', index=True)  # unallocated/allocated/picking/packed/shipped/delivered
     currency_id: Mapped[str] = mapped_column(ForeignKey('dictionaries.id', ondelete='RESTRICT'))
     total_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     discount_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
@@ -353,8 +357,11 @@ class ShipmentOrder(Record, Base):
     __tablename__ = 'shipment_orders'
     order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), unique=True)
     warehouse_id: Mapped[str] = mapped_column(ForeignKey('warehouses.id', ondelete='RESTRICT'))
-    status: Mapped[str] = mapped_column(String(20), default='picking')  # picking / shipped / cancelled
+    status: Mapped[str] = mapped_column(String(20), default='picking')  # picking / packed / shipped / cancelled
+    stage: Mapped[str] = mapped_column(String(12), default='pick', index=True)  # pick / pack / ship（履约任务分组）
+    carrier: Mapped[str] = mapped_column(String(80), default='')
     tracking_no: Mapped[str] = mapped_column(String(120), default='')
+    packed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     remark: Mapped[str] = mapped_column(String(500), default='')
 
@@ -467,6 +474,9 @@ class ChannelSyncJob(Record, Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[str] = mapped_column(String(1000), default='')
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)   # 逐单结果与失败原始报文（重试依据）
+    retry_of_job_id: Mapped[str | None] = mapped_column(ForeignKey('channel_sync_jobs.id', ondelete='SET NULL'), nullable=True, index=True)
+    attempt_no: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class ChannelSkuMapping(Record, Base):
@@ -494,3 +504,100 @@ class ChannelOrderRecord(Record, Base):
     push_shipment_status: Mapped[str] = mapped_column(String(20), default='none')  # none/pending/sent/failed
     tracking_no: Mapped[str] = mapped_column(String(120), default='')
     last_error: Mapped[str] = mapped_column(String(500), default='')
+
+
+# ---------------- OMS 生命周期、协同与履约扩展 ----------------
+
+class OrderEvent(Record, Base):
+    """订单事件时间线（OMS-M03）：状态变更、外部回执与人工处理统一留痕。"""
+    __tablename__ = 'order_events'
+    __table_args__ = (UniqueConstraint('order_id', 'idempotency_key', name='uq_order_event_idempotency'),)
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='CASCADE'), index=True)
+    event_type: Mapped[str] = mapped_column(String(40), index=True)  # status_change/reservation/shipment/logistics/exception/sync/note
+    dimension: Mapped[str | None] = mapped_column(String(24), nullable=True)  # order/payment/fulfillment
+    from_value: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    to_value: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    source: Mapped[str] = mapped_column(String(40), default='erp')  # erp/storefront/channel/carrier/system/payment
+    message: Mapped[str] = mapped_column(String(500), default='')
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+
+
+class OrderReservation(Record, Base):
+    """订单库存预留记录（OMS-M04）：每次预留/释放/失败/出库消耗的单据视图。
+    实际库存占用仍由 inventory_allocations 承担；本表面向订单侧审计与展示。"""
+    __tablename__ = 'order_reservations'
+    __table_args__ = (UniqueConstraint('idempotency_key', name='uq_order_reservation_idempotency'),)
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='CASCADE'), index=True)
+    warehouse_id: Mapped[str | None] = mapped_column(ForeignKey('warehouses.id', ondelete='SET NULL'), nullable=True, index=True)
+    shipment_id: Mapped[str | None] = mapped_column(ForeignKey('shipment_orders.id', ondelete='SET NULL'), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default='reserved', index=True)  # reserved/released/failed/consumed
+    lines: Mapped[dict] = mapped_column(JSON, default=dict)   # {sku_id: quantity}
+    error: Mapped[str] = mapped_column(String(500), default='')
+    idempotency_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class RoutingRule(Record, Base):
+    """订单路由规则（OMS-M05）：按国家/店铺/渠道/金额条件把订单指向仓库，priority 小者优先。"""
+    __tablename__ = 'routing_rules'
+    name: Mapped[str] = mapped_column(String(120))
+    priority: Mapped[int] = mapped_column(Integer, default=100, index=True)
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey('warehouses.id', ondelete='RESTRICT'), index=True)
+    countries: Mapped[list] = mapped_column(JSON, default=list)     # 收货国家代码；空=不限
+    shop_ids: Mapped[list] = mapped_column(JSON, default=list)      # 空=不限
+    channel_codes: Mapped[list] = mapped_column(JSON, default=list) # 空=不限
+    conditions: Mapped[dict] = mapped_column(JSON, default=dict)    # 预留金额/数量等约束
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    remark: Mapped[str] = mapped_column(String(500), default='')
+
+
+class RoutingDecision(Record, Base):
+    """路由与分仓详情（OMS-PG-008）：一次路由的结果、命中规则与逐仓分配建议。"""
+    __tablename__ = 'routing_decisions'
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='CASCADE'), index=True)
+    rule_id: Mapped[str | None] = mapped_column(ForeignKey('routing_rules.id', ondelete='SET NULL'), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default='auto')  # auto/manual/failed
+    warehouse_id: Mapped[str | None] = mapped_column(ForeignKey('warehouses.id', ondelete='SET NULL'), nullable=True)
+    allocations: Mapped[list] = mapped_column(JSON, default=list)    # [{warehouse_id, lines:{sku:qty}, shortage}]
+    reason: Mapped[str] = mapped_column(String(500), default='')
+
+
+class OrderException(Record, Base):
+    """异常订单（OMS-M07）：支付/缺货/路由/地址/超时/物流/同步异常的处理工单。"""
+    __tablename__ = 'order_exceptions'
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='CASCADE'), index=True)
+    exception_type: Mapped[str] = mapped_column(String(32), index=True)  # payment/stockout/routing_failed/address/shipment_timeout/logistics/sync_failure
+    status: Mapped[str] = mapped_column(String(16), default='open', index=True)  # open/processing/resolved/ignored
+    reason: Mapped[str] = mapped_column(String(500))
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    resolution: Mapped[str] = mapped_column(String(500), default='')
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    assignee_id: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    detected_by: Mapped[str] = mapped_column(String(24), default='system')  # system/manual
+
+
+class LogisticsEvent(Record, Base):
+    """物流跟踪节点（OMS-PG-011）：承运商 webhook 或人工登记的运单事件。"""
+    __tablename__ = 'logistics_events'
+    __table_args__ = (UniqueConstraint('dedup_key', name='uq_logistics_event_dedup'),)
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='CASCADE'), index=True)
+    shipment_id: Mapped[str | None] = mapped_column(ForeignKey('shipment_orders.id', ondelete='SET NULL'), nullable=True, index=True)
+    tracking_no: Mapped[str] = mapped_column(String(120), default='', index=True)
+    carrier: Mapped[str] = mapped_column(String(80), default='')
+    event_code: Mapped[str] = mapped_column(String(40), index=True)  # picked/in_transit/out_for_delivery/delivered/exception
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    source: Mapped[str] = mapped_column(String(24), default='manual')  # carrier_webhook/manual/system
+    message: Mapped[str] = mapped_column(String(500), default='')
+    dedup_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+
+
+class OrderRuleConfig(Record, Base):
+    """订单规则配置（OMS-PG-017）：状态超时阈值、异常自动开单开关等运行参数。"""
+    __tablename__ = 'order_rule_configs'
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    description: Mapped[str] = mapped_column(String(500), default='')
+    updated_by: Mapped[str | None] = mapped_column(ForeignKey('users.id', ondelete='SET NULL'), nullable=True)

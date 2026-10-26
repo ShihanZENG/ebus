@@ -1,11 +1,13 @@
 """OMS 销售订单、付款、售后、批量操作与看板汇总路由。"""
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, func, or_, and_
 from . import models as m, schemas as s
 from .security import session_db, require, record_audit, role_for
 from . import wms
+from .order_lifecycle import lifecycle
 
 CENTS = Decimal('0.01')
 
@@ -228,6 +230,44 @@ def list_orders(status: s.OrderStatus | None = None,
         data['shop_name'] = shop_names.get(r.shop_id, '')
         items.append(data)
     return {'items': items, 'total': total, 'page': page, 'page_size': page_size}
+
+
+@router.get('/export')
+def export_reconciliation_orders(date_from: date, date_to: date,
+                                 shop_id: str | None = None,
+                                 limit: int = Query(5000, ge=1, le=10000),
+                                 db=Depends(session_db), user=Depends(require('orders:read'))):
+    """Export minimal order references for an operator-controlled reconciliation preview."""
+    if date_to < date_from or (date_to - date_from).days > 92:
+        raise HTTPException(422, '导出期间最多支持连续 93 天')
+    if shop_id and user.shop_scope is not None and shop_id not in user.shop_scope:
+        raise HTTPException(404, '店铺不存在或不可访问')
+    start = datetime.combine(date_from, datetime.min.time(), timezone.utc).replace(tzinfo=None)
+    end = datetime.combine(date_to + timedelta(days=1), datetime.min.time(), timezone.utc).replace(tzinfo=None)
+    conditions = [m.SalesOrder.created_at >= start, m.SalesOrder.created_at < end]
+    if user.shop_scope is not None:
+        conditions.append(m.SalesOrder.shop_id.in_(user.shop_scope))
+    if shop_id:
+        conditions.append(m.SalesOrder.shop_id == shop_id)
+    rows = db.execute(select(m.SalesOrder, m.Shop.code, m.Dictionary.code)
+        .join(m.Shop, m.Shop.id == m.SalesOrder.shop_id)
+        .join(m.Dictionary, m.Dictionary.id == m.SalesOrder.currency_id)
+        .where(*conditions).order_by(m.SalesOrder.created_at, m.SalesOrder.id).limit(limit + 1)).all()
+    truncated = len(rows) > limit
+    rows = rows[:limit]
+    return {
+        'schema_version': '1.0.0', 'source_system': 'OMS',
+        'generated_at': m.now().isoformat() + 'Z',
+        'period': {'from': date_from.isoformat(), 'to': date_to.isoformat(), 'time_basis': 'created_at_utc'},
+        'truncated': truncated, 'count': len(rows),
+        'items': [{
+            'shop_id': order.shop_id, 'shop_code': shop_code,
+            'source_channel': order.source_channel, 'source_order_no': order.source_order_no,
+            'currency': currency.upper(), 'grand_total': str(order.grand_total),
+            'status': order.status,
+            'created_at': order.created_at.replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z'),
+        } for order, shop_code, currency in rows],
+    }
 
 
 @router.post('', status_code=201)
@@ -734,3 +774,8 @@ def resolve_after_sale(after_sale_id: str, payload: s.AfterSaleResolve,
     record_audit(db, user, 'after_sales', record.id, 'resolve', before=auditable(before), after=auditable(result))
     db.commit()
     return result
+
+
+@router.get('/{order_id}/lifecycle')
+def order_lifecycle(order_id: str, db=Depends(session_db), user=Depends(require('orders:read'))):
+    return lifecycle(db, user, get_order_or_404(db, user, order_id))

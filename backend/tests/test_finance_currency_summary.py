@@ -35,6 +35,9 @@ def test_finance_summary_groups_orders_payments_refunds_and_fees_by_currency(set
                             method='manual', source='manual'),
             m.PaymentRecord(order_id=orders[1].id, amount=Decimal('20'), currency_id=eur['id'],
                             method='manual', source='manual'),
+            m.PaymentRecord(order_id=orders[0].id, amount=Decimal('999'), currency_id=usd['id'],
+                            record_type='simulated', reconciliation_status='simulated',
+                            method='manual', source='test simulation'),
         ])
         db.add(m.AfterSale(order_id=orders[0].id, type='refund', reason='test', status='completed',
                            quantity=0, amount=Decimal('15'), refund_execution={
@@ -76,6 +79,11 @@ def test_finance_summary_groups_orders_payments_refunds_and_fees_by_currency(set
         'fee_record_count': 1, 'fee_amount_record_count': 1,
         'fee_review_pending_count': 0,
     }
+    meta = response.json()['data_meta']
+    assert meta['source_mode'] == 'local_records'
+    assert meta['data_status'] == 'available'
+    assert meta['simulated_record_count'] == 1
+    assert meta['unclassified_legacy_payment_count'] == 1
     assert client.get('/api/v1/profit-reconciliations/summary').status_code == 401
     no_access_role = client.post('/api/v1/roles', headers=auth, json={
         'code': 'finance_summary_denied', 'name': '无财务权限', 'permissions': ['orders:read'],
@@ -83,6 +91,7 @@ def test_finance_summary_groups_orders_payments_refunds_and_fees_by_currency(set
     _, no_access = create_user(client, auth, role=no_access_role['id'], username='no_finance_summary')
     assert client.get('/api/v1/profit-reconciliations/summary', headers=no_access).status_code == 403
     _, empty_scope = create_user(client, auth, role=role['id'], username='empty_finance_scope', shop_scope=[])
-    assert client.get('/api/v1/profit-reconciliations/summary', headers=empty_scope).json() == {
-        'by_currency': [],
-    }
+    empty_summary = client.get('/api/v1/profit-reconciliations/summary', headers=empty_scope).json()
+    assert empty_summary['by_currency'] == []
+    assert empty_summary['data_meta']['data_status'] == 'missing'
+    assert empty_summary['data_meta']['last_record_updated_at'] is None
