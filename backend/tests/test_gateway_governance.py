@@ -43,4 +43,5 @@ def test_model_chat_returns_quota_http_status_without_provider_call(setup, monke
     monkeypatch.setattr(gw, 'complete', denied)
     response = client.post('/api/v1/lim/model-chat', headers=admin, json={'prompt': 'hello'})
     assert response.status_code == 429
-    assert 'MODEL_QUOTA_EXCEEDED' in response.json()['detail']
+    assert response.json()['error']['code'] == 'HTTP_429'
+    assert 'MODEL_QUOTA_EXCEEDED' in response.json()['error']['message']

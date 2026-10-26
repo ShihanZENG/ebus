@@ -44,6 +44,8 @@ docker compose -p crossborder-erp up -d redis
 
 本地 compose 只在 127.0.0.1:16379 暴露 Redis。需要共享治理时，在本地 `.env` 设置 `LIM_REDIS_URL=redis://127.0.0.1:16379/0`，然后重启后端。不要复制示例文件覆盖已有密钥。
 
+本工作区的本地演示服务已于 2026-10-26 实际启用上述 Redis 配置：迁移前备份为 `backend/backups/erp_pre_lim_v11_20261026_111326.dump`（681,262 字节）；Redis healthcheck 为 healthy；Alembic `/ready` 报告 revision `0047`；后端重启后，管理员鉴权访问 `/api/v1/lim/model-metrics` 返回 HTTP 200、治理模式 `redis`、60 次/分钟、并发 3、日预算 1,000,000 Token。没有发送模型请求。
+
 新增迁移 0047 仅为调用表添加 scene 和 attempts，历史记录默认场景 `*`、空尝试数组。它接在当前工作区已有的 0046 后；发布时必须携带完整迁移链。
 
 ## 验证与已知边界
