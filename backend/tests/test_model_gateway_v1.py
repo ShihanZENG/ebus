@@ -67,8 +67,8 @@ def test_gateway_chat_auth_metadata_and_private_logging(setup, monkeypatch):
         requests.append(json.loads(request.content))
         return httpx.Response(200, json={'choices': [{'message': {'role': 'assistant', 'content': '收到'}}],
                                         'usage': {'prompt_tokens': 10, 'completion_tokens': 2, 'total_tokens': 12}})
-    real_client = httpx.Client
-    monkeypatch.setattr(gw.httpx, 'Client', lambda **kwargs: real_client(transport=httpx.MockTransport(respond), **kwargs))
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(gw.httpx, 'AsyncClient', lambda **kwargs: real_client(transport=httpx.MockTransport(respond), **kwargs))
     url = '/api/v1/lim/model-chat'
     assert client.post(url, json={'prompt': 'hello'}).status_code == 401
     result = client.post(url, headers=auth, json={'prompt': 'private-input', 'scene': 'inventory'})
@@ -87,7 +87,7 @@ def test_gateway_chat_auth_metadata_and_private_logging(setup, monkeypatch):
     assert client.post(url, headers=auth, json={'prompt': ''}).status_code == 422
     _, reader = create_user(client, auth)
     assert client.post(url, headers=reader, json={'prompt': 'hello'}).status_code == 403
-    monkeypatch.setattr(gw.httpx, 'Client', lambda **kwargs: real_client(
+    monkeypatch.setattr(gw.httpx, 'AsyncClient', lambda **kwargs: real_client(
         transport=httpx.MockTransport(lambda request: httpx.Response(503, text='test-only-key')), **kwargs))
     failed = client.post(url, headers=auth, json={'prompt': 'hello'})
     assert failed.status_code == 503 and 'test-only-key' not in failed.text
@@ -95,7 +95,7 @@ def test_gateway_chat_auth_metadata_and_private_logging(setup, monkeypatch):
         failures = db.scalars(select(LimModelCall).where(LimModelCall.status == 'FAILED')).all()
         assert len(failures) == 1 and failures[0].error_code == 'MODEL_HTTP_ERROR'
     for content in [None, {}, [], '', '  ']:
-        monkeypatch.setattr(gw.httpx, 'Client', lambda **kwargs: real_client(
+        monkeypatch.setattr(gw.httpx, 'AsyncClient', lambda **kwargs: real_client(
             transport=httpx.MockTransport(lambda request: httpx.Response(200, json={
                 'choices': [{'message': {'content': content}}]})), **kwargs))
         response = client.post(url, headers=auth, json={'prompt': 'hello'})

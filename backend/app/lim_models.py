@@ -579,3 +579,5 @@ class LimModelCall(m.Record, m.Base):
     cost: Mapped[float | None] = mapped_column(Numeric(14, 6), nullable=True)
     cache_hit: Mapped[bool] = mapped_column(default=False, server_default=text('false'))
     request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scene: Mapped[str] = mapped_column(String(64), default='*', server_default='*')
+    attempts: Mapped[list] = mapped_column(JSON, default=list, server_default=text("'[]'"))

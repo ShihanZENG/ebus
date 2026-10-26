@@ -1,3 +1,4 @@
+import ModelGatewayOverview from '../components/ModelGatewayOverview'
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -126,6 +127,7 @@ export default function LimConsolePage({ section = 'overview' }: { section?: Lim
   const [gwProviders, setGwProviders] = useState<LimModelProvider[]>([])
   const [gwCatalogs, setGwCatalogs] = useState<LimModelCatalogEntry[]>([])
   const [gwCalls, setGwCalls] = useState<LimModelCallRecord[]>([])
+  const [gwMetrics, setGwMetrics] = useState<Awaited<ReturnType<typeof limApi.modelMetrics>> | null>(null)
   const [gwBusy, setGwBusy] = useState(false)
   const [gwTestResult, setGwTestResult] = useState<Record<string, unknown> | null>(null)
   const [safetyOverview, setSafetyOverview] = useState<LimSafetyOverview | null>(null)
@@ -165,9 +167,9 @@ export default function LimConsolePage({ section = 'overview' }: { section?: Lim
   const refresh = useCallback(async () => {
     setBusy(true)
     try {
-      const [a, t, r, d, k, w, s, alertPage, rules, evals, gp, gc, gcall, so] = await Promise.all([limApi.agents(), limApi.tools(), limApi.runs(), limApi.datasets(), limApi.knowledgeSources(), limApi.workflows(), limApi.skills(), limApi.alerts(), limApi.alertRules(), limApi.evalRuns(), limApi.modelProviders(), limApi.modelCatalogs(), limApi.modelCalls(), limApi.safetyOverview()])
+      const [a, t, r, d, k, w, s, alertPage, rules, evals, gp, gc, gcall, so, gm] = await Promise.all([limApi.agents(), limApi.tools(), limApi.runs(), limApi.datasets(), limApi.knowledgeSources(), limApi.workflows(), limApi.skills(), limApi.alerts(), limApi.alertRules(), limApi.evalRuns(), limApi.modelProviders(), limApi.modelCatalogs(), limApi.modelCalls(), limApi.safetyOverview(), limApi.modelMetrics()])
       setAgents(a.items); setTools(t.items); setRuns(r.items); setDatasets(d.items); setKnowledge(k.items); setWorkflows(w.items); setSkills(s.items); setAlerts(alertPage.items); setAlertRules(rules.items); setEvalRunOptions(evals.items.filter((item) => item.status === 'COMPLETED')); setSelectedWorkflowId(w.items[0]?.workflow_id ?? null)
-      setGwProviders(gp.items); setGwCatalogs(gc.items); setGwCalls(gcall.items); setSafetyOverview(so)
+      setGwProviders(gp.items); setGwCatalogs(gc.items); setGwCalls(gcall.items); setSafetyOverview(so); setGwMetrics(gm)
     } catch (error) { message.error(error instanceof Error ? error.message : '加载 LIM 数据失败') }
     finally { setBusy(false) }
   }, [])
@@ -732,31 +734,41 @@ export default function LimConsolePage({ section = 'overview' }: { section?: Lim
         {workflowResult && <Card title="最近一次 Workflow Run" extra={<Button onClick={() => void openWorkflowTrace(String(workflowResult.workflow_run_id))}>查看 Trace</Button>}><Descriptions items={[{ key: 'workflow', label: 'Workflow', children: `${workflowResult.workflow_id} v${workflowResult.workflow_version}` }, { key: 'status', label: '状态', children: <Tag>{String(workflowResult.status)}</Tag> }, { key: 'run', label: 'Run ID', children: String(workflowResult.workflow_run_id) }]} /><pre style={{ maxHeight: 480, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{pretty(workflowResult.output_summary)}</pre></Card>}
       </Space> },
       { key: 'modelGateway', label: '模型网关', children: <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <ModelGatewayOverview metrics={gwMetrics} />
         <ModelGatewayPlayground onComplete={refresh} />
         <Alert type="info" showIcon message="统一模型出口：注册供应商（Key 只存环境变量名，不落库）、别名→模型按场景分流、连通性测试与调用观测。LLM 循环与采购 Agent 共用此处配置。" />
-        <Card title="供应商" extra={<Space><Button onClick={() => void createGwProvider()}>新建供应商</Button></Space>}>
+        <Card title="供应商" extra={<Space><Button disabled={!canManageAlerts} onClick={() => void createGwProvider()}>新建供应商</Button></Space>}>
           <Table rowKey="provider_id" size="small" pagination={false} loading={busy} dataSource={gwProviders} columns={[
             { title: 'ID', dataIndex: 'provider_id' },
             { title: '名称', dataIndex: 'name' },
             { title: 'Base URL', dataIndex: 'base_url' },
             { title: 'Key 环境变量', dataIndex: 'api_key_env' },
             { title: '状态', render: (_: unknown, row: LimModelProvider) => <Tag color={row.enabled ? 'green' : 'default'}>{row.enabled ? '启用' : '停用'}</Tag> },
-            { title: '操作', render: (_: unknown, row: LimModelProvider) => <Button size="small" loading={gwBusy} onClick={() => void testGwProvider(row)}>测试连通</Button> },
+            { title: '操作', render: (_: unknown, row: LimModelProvider) => <Button disabled={!canManageAlerts} size="small" loading={gwBusy} onClick={() => void testGwProvider(row)}>测试连通</Button> },
           ]} />
         </Card>
-        <Card title="别名 → 模型" extra={<Button onClick={() => void createGwCatalog()}>新建别名</Button>}>
+        <Card title="别名 → 模型" extra={<Button disabled={!canManageAlerts} onClick={() => void createGwCatalog()}>新建别名</Button>}>
           <Table rowKey="alias_id" size="small" pagination={false} loading={busy} dataSource={gwCatalogs} columns={[
             { title: '别名', dataIndex: 'alias' },
             { title: '供应商', dataIndex: 'provider_id' },
             { title: '模型', dataIndex: 'model_name' },
             { title: '场景', dataIndex: 'scene' },
             { title: '状态', render: (_: unknown, row: LimModelCatalogEntry) => <Tag color={row.enabled ? 'green' : 'default'}>{row.enabled ? '启用' : '停用'}</Tag> },
-            { title: '操作', render: (_: unknown, row: LimModelCatalogEntry) => <Button size="small" danger onClick={() => void disableGwCatalog(row)}>停用</Button> },
+            { title: '操作', render: (_: unknown, row: LimModelCatalogEntry) => <Button disabled={!canManageAlerts} size="small" danger onClick={() => void disableGwCatalog(row)}>停用</Button> },
           ]} />
         </Card>
         {gwTestResult && <Alert type={gwTestResult.ok ? 'success' : 'warning'} showIcon closable onClose={() => setGwTestResult(null)} message={pretty(gwTestResult)} />}
         <Card title="最近模型调用" loading={busy}>
-          <Table rowKey="call_id" size="small" pagination={false} dataSource={gwCalls} columns={[
+          <Table rowKey="call_id" size="small" pagination={false} dataSource={gwCalls} expandable={{
+            rowExpandable: (row) => row.attempts.length > 0,
+            expandedRowRender: (row) => <Table rowKey="number" size="small" pagination={false} dataSource={row.attempts} columns={[
+              { title: '尝试', dataIndex: 'number' }, { title: '供应商', dataIndex: 'provider_id' },
+              { title: '模型', dataIndex: 'model' }, { title: '状态', dataIndex: 'status' },
+              { title: '错误码', dataIndex: 'error_code' }, { title: '耗时 (ms)', dataIndex: 'latency_ms' },
+            ]} />,
+          }} columns={[
+            { title: '场景', dataIndex: 'scene' },
+            { title: '尝试次数', dataIndex: 'attempt_count' },
             { title: '时间', dataIndex: 'created_at', render: (v: string) => new Date(v).toLocaleString() },
             { title: '供应商', dataIndex: 'provider_id' },
             { title: '模型', dataIndex: 'model' },

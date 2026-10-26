@@ -1217,9 +1217,12 @@ def model_chat(payload: ModelChatInput, user=Depends(require('lim:manage')),
                _reader=Depends(require('assistant:read'))):
     """管理端调试已注册路由；沿用业务网关及调用记录，不开放业务写工具。"""
     from .lim_model_gateway import complete
+    from .lim_governance import GovernanceError
     try:
         return complete([{'role': 'user', 'content': payload.prompt}], [], 40,
                         alias=payload.alias, scene=payload.scene, actor_id=user.id, return_metadata=True)
+    except GovernanceError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from None
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from None
 
@@ -1367,8 +1370,9 @@ def test_model_provider(payload: ProviderTestInput, db=Depends(session_db),
 @router.get('/model-calls')
 def list_model_calls(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
                      db=Depends(session_db), user=Depends(require('assistant:read'))):
-    total = db.scalar(select(func.count()).select_from(LimModelCall)) or 0
-    rows = db.scalars(select(LimModelCall).order_by(LimModelCall.created_at.desc(), LimModelCall.call_id)
+    filters = _model_call_filters(db, user)
+    total = db.scalar(select(func.count()).select_from(LimModelCall).where(*filters)) or 0
+    rows = db.scalars(select(LimModelCall).where(*filters).order_by(LimModelCall.created_at.desc(), LimModelCall.call_id)
                       .offset((page - 1) * page_size).limit(page_size)).all()
     return {'total': total, 'page': page, 'page_size': page_size, 'items': [{
         'call_id': row.call_id, 'created_at': row.created_at, 'provider_id': row.provider_id,
@@ -1376,7 +1380,21 @@ def list_model_calls(page: int = Query(1, ge=1), page_size: int = Query(50, ge=1
         'latency_ms': row.latency_ms, 'prompt_tokens': row.prompt_tokens,
         'completion_tokens': row.completion_tokens, 'total_tokens': row.total_tokens,
         'run_id': row.run_id,
+        'scene': row.scene, 'attempt_count': len(row.attempts or []), 'attempts': row.attempts or [],
     } for row in rows]}
+
+
+def _model_call_filters(db, user):
+    return [] if _admin_or(db, user, 'lim:manage', 'audit:read') else [LimModelCall.actor_id == user.id]
+
+
+@router.get('/model-metrics')
+def model_metrics(days: int = Query(7, ge=1, le=90), db=Depends(session_db),
+                  user=Depends(require('assistant:read'))):
+    from .lim_gateway_metrics import aggregate_model_calls
+    from .lim_governance import governance_status
+    filters = _model_call_filters(db, user) + [LimModelCall.created_at >= m.now() - timedelta(days=days)]
+    return {**aggregate_model_calls(db, filters), 'days': days, 'governance': governance_status()}
 
 @router.get('/safety/overview')
 def lim_safety_overview(db=Depends(session_db), user=Depends(require('assistant:read'))):

@@ -29,7 +29,13 @@ export type LimSkillVersion = { skill_id: string; version: string; display_name:
 
 export type LimModelProvider = { provider_id: string; name: string; protocol: string; base_url: string; api_key_env: string; enabled: boolean; priority: number; timeout_ms: number; status: string }
 export type LimModelCatalogEntry = { alias_id: string; alias: string; provider_id: string; model_name: string; scene: string; enabled: boolean; priority: number }
-export type LimModelCallRecord = { call_id: string; created_at: string; provider_id: string; model: string; status: string; error_code: string | null; latency_ms: number | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; run_id: string | null }
+export type LimModelAttempt = { number: number; provider_id: string; model: string; status: string; error_code: string | null; latency_ms: number; http_status: number | null; total_tokens: number | null }
+export type LimModelCallRecord = { call_id: string; created_at: string; provider_id: string; model: string; status: string; error_code: string | null; latency_ms: number | null; prompt_tokens: number | null; completion_tokens: number | null; total_tokens: number | null; run_id: string | null; scene: string; attempt_count: number; attempts: LimModelAttempt[] }
+export type LimModelMetrics = {
+  days: number; call_count: number; status_counts: Record<string, number>; success_rate: number | null
+  known_total_tokens: number | null; unknown_usage_count: number; mean_latency_ms: number | null
+  governance: { mode: 'redis' | 'memory_single_process'; limits: { requests_per_minute: number; concurrency: number; daily_tokens: number; max_attempts: number; circuit_threshold: number; circuit_seconds: number } }
+}
 export type ProviderTestResult = { ok: boolean; status_code?: number; latency_ms?: number; model?: string; reply_preview?: string; usage?: Record<string, unknown>; error?: string }
 export type LimSafetyOverview = {
   generated_at: string
@@ -105,6 +111,7 @@ export const limApi = {
   updateModelCatalog: (id: string, body: unknown) => request<LimModelCatalogEntry>(`/lim/model-catalogs/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   disableModelCatalog: (id: string) => request<void>(`/lim/model-catalogs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   modelCalls: () => request<PageResult<LimModelCallRecord>>('/lim/model-calls', { params: { page_size: 50 } }),
+  modelMetrics: () => request<LimModelMetrics>('/lim/model-metrics'),
   approveRun: (id: string) => request<LimRun>(`/lim/runs/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
   rejectRun: (id: string, reason?: string) => request<LimRun>(`/lim/runs/${encodeURIComponent(id)}/reject`, { method: 'POST', params: reason ? { reason } : {} }),
   safetyOverview: () => request<LimSafetyOverview>('/lim/safety/overview'),
