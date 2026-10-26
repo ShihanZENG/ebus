@@ -58,6 +58,7 @@ import OperationsAgentPage from './pages/OperationsAgentPage'
 import CustomerAgentPage from './pages/CustomerAgentPage'
 import WorkspacePage from './pages/WorkspacePage'
 import LimConsolePage from './pages/LimConsolePage'
+import LimEnterpriseWorkbenchPage from './pages/LimEnterpriseWorkbenchPage'
 import LimReplenishmentPage from './pages/LimReplenishmentPage'
 import OmsReconciliationPrepPage from './pages/OmsReconciliationPrepPage'
 import AdGrowthAIPage from './pages/AdGrowthAIPage'
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="dashboard" element={<Guard><DashboardPage /></Guard>} />
         <Route path="ai-dashboard" element={<PermissionGuard permission={NAV_PERMISSION['ai-dashboard']}><AiOpsOverviewPage /></PermissionGuard>} />
         <Route path="lim-console" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="overview" /></PermissionGuard>} />
+        <Route path="lim-workbench" element={<PermissionGuard permission="assistant:read"><LimEnterpriseWorkbenchPage /></PermissionGuard>} />
         <Route path="lim-agent-runtime" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="agentRuntime" /></PermissionGuard>} />
         <Route path="lim-tool-registry" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="toolRegistry" /></PermissionGuard>} />
         <Route path="lim-workflow" element={<PermissionGuard permission="assistant:read"><LimConsolePage section="workflow" /></PermissionGuard>} />

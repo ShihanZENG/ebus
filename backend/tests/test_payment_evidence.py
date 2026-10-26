@@ -55,7 +55,7 @@ def test_real_payment_requires_valid_evidence_and_waits_for_human_reconciliation
     endpoint = f"/api/v1/orders/{order['id']}/payments/real"
     fields = {
         'amount': '100.00', 'fee_amount': '15.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-2026-001', 'remark': '2026年10月结算',
+        'method': '平台结算', 'source': 'SETTLE-2026-001', 'external_transaction_id': 'SETTLE-2026-001', 'remark': '2026年10月结算',
     }
 
     missing = client.post(endpoint, headers=auth, data=fields)
@@ -117,7 +117,7 @@ def test_real_payment_rejects_invalid_fee_and_oversized_evidence_without_partial
     endpoint = f"/api/v1/orders/{order['id']}/payments/real"
     fields = {
         'amount': '100.00', 'fee_amount': '100.01', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-INVALID-001',
+        'method': '平台结算', 'source': 'SETTLE-INVALID-001', 'external_transaction_id': 'SETTLE-INVALID-001',
     }
     fee_over_gross = client.post(endpoint, headers=auth, data=fields, files={
         'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf'),
@@ -143,7 +143,7 @@ def test_reconciliation_refuses_missing_or_modified_evidence(setup, tmp_path, mo
     order, currency = create_test_order(client, auth)
     created = client.post(f"/api/v1/orders/{order['id']}/payments/real", headers=auth, data={
         'amount': '100.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-MISSING-001',
+        'method': '平台结算', 'source': 'SETTLE-MISSING-001', 'external_transaction_id': 'SETTLE-MISSING-001',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf')})
     assert created.status_code == 201, created.text
     payment = created.json()
@@ -171,7 +171,7 @@ def test_real_payment_rejects_fractional_cent_fee_and_currency_mismatch(setup, t
     endpoint = f"/api/v1/orders/{order['id']}/payments/real"
     fields = {
         'amount': '100.00', 'fee_amount': '-0.004', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-PRECISION-001',
+        'method': '平台结算', 'source': 'SETTLE-PRECISION-001', 'external_transaction_id': 'SETTLE-PRECISION-001',
     }
     file = {'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf')}
     negative = client.post(endpoint, headers=auth, data=fields, files=file)
@@ -206,7 +206,7 @@ def test_scope_denies_upload_evidence_read_and_reconciliation(setup, tmp_path, m
     order, currency = create_test_order(client, auth)
     created = client.post(f"/api/v1/orders/{order['id']}/payments/real", headers=auth, data={
         'amount': '10.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-SCOPE-001',
+        'method': '平台结算', 'source': 'SETTLE-SCOPE-001', 'external_transaction_id': 'SETTLE-SCOPE-001',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf')})
     assert created.status_code == 201, created.text
     payment = created.json()
@@ -218,7 +218,7 @@ def test_scope_denies_upload_evidence_read_and_reconciliation(setup, tmp_path, m
     endpoint = f"/api/v1/orders/{order['id']}/payments"
     assert client.post(f'{endpoint}/real', headers=scoped_auth, data={
         'amount': '10.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-SCOPE-002',
+        'method': '平台结算', 'source': 'SETTLE-SCOPE-002', 'external_transaction_id': 'SETTLE-SCOPE-002',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf')}).status_code == 404
     assert client.get(f"{endpoint}/{payment['id']}/evidence", headers=scoped_auth).status_code == 404
     assert client.post(f"{endpoint}/{payment['id']}/reconcile", headers=scoped_auth, json={}).status_code == 404
@@ -231,7 +231,7 @@ def test_startup_recovers_committed_staged_evidence(setup, tmp_path, monkeypatch
     order, currency = create_test_order(client, auth)
     created = client.post(f"/api/v1/orders/{order['id']}/payments/real", headers=auth, data={
         'amount': '10.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-RECOVERY-001',
+        'method': '平台结算', 'source': 'SETTLE-RECOVERY-001', 'external_transaction_id': 'SETTLE-RECOVERY-001',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 recover me', 'application/pdf')})
     assert created.status_code == 201, created.text
     payment = created.json()
@@ -266,7 +266,7 @@ def test_disk_write_failure_leaves_no_payment_or_partial_evidence(setup, tmp_pat
     monkeypatch.setattr(Path, 'write_bytes', fail_evidence_write)
     response = client.post(f"/api/v1/orders/{order['id']}/payments/real", headers=auth, data={
         'amount': '10.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-DISK-FAIL-001',
+        'method': '平台结算', 'source': 'SETTLE-DISK-FAIL-001', 'external_transaction_id': 'SETTLE-DISK-FAIL-001',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 proof', 'application/pdf')})
     assert response.status_code == 500
     assert client.get(f"/api/v1/orders/{order['id']}", headers=auth).json()['payments'] == []
@@ -283,7 +283,7 @@ def test_interrupted_file_promotion_is_recovered_without_confirming_missing_proo
     monkeypatch.setattr(os, 'replace', lambda *_: (_ for _ in ()).throw(OSError('simulated interruption')))
     response = client.post(f"/api/v1/orders/{order['id']}/payments/real", headers=auth, data={
         'amount': '10.00', 'fee_amount': '0.00', 'currency_id': currency['id'],
-        'method': '平台结算', 'source': 'SETTLE-RECOVER-INTERRUPT-001',
+        'method': '平台结算', 'source': 'SETTLE-RECOVER-INTERRUPT-001', 'external_transaction_id': 'SETTLE-RECOVER-INTERRUPT-001',
     }, files={'evidence': ('proof.pdf', b'%PDF-1.4 recover me', 'application/pdf')})
     assert response.status_code == 500
     row = client.get(f"/api/v1/orders/{order['id']}", headers=auth).json()['payments'][0]

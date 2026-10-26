@@ -13,3 +13,8 @@ redis==5.0.4
 langgraph==1.2.17
 langgraph-checkpoint==4.3.0
 langgraph-sdk==0.4.9
+# LIM v2 graph and observability adapters. Keep Langfuse v2 until its trace API is migrated.
+neo4j>=5.26.0,<6
+opentelemetry-api>=1.28.0,<2
+opentelemetry-sdk>=1.28.0,<2
+langfuse>=2.54.0,<3

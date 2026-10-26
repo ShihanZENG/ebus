@@ -145,6 +145,20 @@ class Payment(Record, Base):
     provider_ref: Mapped[str] = mapped_column(String(64))
 
 
+class StorefrontHold(Record, Base):
+    """A checkout inventory allocation with a 30 minute expiry."""
+
+    __tablename__ = 'storefront_holds'
+    __table_args__ = (UniqueConstraint('order_id', 'sku_id', name='uq_storefront_hold_order_sku'),
+                      CheckConstraint('quantity > 0', name='ck_storefront_hold_quantity'))
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), index=True)
+    warehouse_id: Mapped[str] = mapped_column(ForeignKey('warehouses.id', ondelete='RESTRICT'))
+    sku_id: Mapped[str] = mapped_column(ForeignKey('skus.id', ondelete='RESTRICT'))
+    quantity: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default='active', index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
 class CustomerAddress(Record, Base):
     __tablename__ = 'storefront_customer_addresses'
     customer_id: Mapped[str] = mapped_column(ForeignKey('storefront_customers.id', ondelete='CASCADE'), index=True)

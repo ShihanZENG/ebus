@@ -192,6 +192,7 @@ const AI_NAV: NavNode[] = [
 
 const LIM_NAV: NavNode[] = [
   { key: 'lim-console', label: '01 平台总览' },
+  { key: 'lim-workbench', label: '多智能体 LIM 工作台' },
   { key: 'lim-model-gateway', label: '02 模型网关' },
   { key: 'lim-agent-runtime', label: '03 智能体运行时' },
   { key: 'lim-tool-registry', label: '04 工具注册中心' },
@@ -233,7 +234,7 @@ export const SYSTEM_NAV: SystemNavigation[] = [
 const SYSTEM_ONLY_ROUTES: Record<SystemNavigation['id'], Set<string>> = {
   erp: new Set(),
   ai: new Set(['ai/tasks', 'ai-dashboard', 'ai-copilot', 'ai-copilot-analysis', 'ai-risk-center', 'ai-strategy-center', 'ai-approval-center', 'ai-execution-center', 'ai-agent-workbench', 'ai-agent-collab', 'ai-effect-overview', 'ai-effect', 'ai-task-history', 'ai-strategy-templates', 'ai-capability', 'product-agent', 'operations-agent', 'lim-replenishment', 'purchase-agent', 'ad-growth', 'profit-finance', 'customer-agent']),
-  lim: new Set(['lim-console', 'lim-agent-runtime', 'lim-tool-registry', 'lim-workflow', 'lim-runs', 'lim-alerts', 'lim-eval', 'lim-knowledge', 'lim-skills', 'lim-model-gateway', 'lim-diagnosis']),
+  lim: new Set(['lim-console', 'lim-workbench', 'lim-agent-runtime', 'lim-tool-registry', 'lim-workflow', 'lim-runs', 'lim-alerts', 'lim-eval', 'lim-knowledge', 'lim-skills', 'lim-model-gateway', 'lim-diagnosis']),
   storefront: new Set(['storefront']),
 }
 
@@ -322,6 +323,7 @@ export const NAV_PERMISSION: Record<string, string> = {
   'ai-assistant': 'assistant:read',
   'ai-task-history': 'assistant:read',
   'lim-console': 'assistant:read',
+  'lim-workbench': 'assistant:read',
   'lim-agent-runtime': 'assistant:read',
   'lim-tool-registry': 'assistant:read',
   'lim-workflow': 'assistant:read',

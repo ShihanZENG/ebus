@@ -1,6 +1,8 @@
 # 跨系统修复任务清单
 
-排序依据是实际阻断 Storefront → 独立 OMS → ERP 业务闭环的程度。证据与运行结果分别见 `BUSINESS_FLOW_AUDIT.md`、`INTEGRATION_GAPS.md`、`E2E_TEST_REPORT.md`。本轮未执行下列业务代码变更。
+排序依据是实际阻断 Storefront → 独立 OMS → ERP 业务闭环的程度。证据与运行结果分别见 `BUSINESS_FLOW_AUDIT.md`、`INTEGRATION_GAPS.md`、`E2E_TEST_REPORT.md`。
+
+**2026-10-26 增量进展：** 主 ERP 已增加 `OmsOutboxEvent` 持久化表与结账同事务写入；独立 OMS 消费、双库交接契约与重试 Worker 尚未实现，P0-01 保持未关闭。`LIM_STOREFRONT_ATOMIC_HOLD=true` 时，结账采用 30 分钟库存分配预占，取消、下次结账、发货申请前的到期检查可释放预占；另有需由部署侧定时调用的鉴权接口 `POST /api/v1/storefront/holds/expire`，默认演示路径维持原行为，并需 PostgreSQL 并发验收与实际调度，P0-02 保持未关闭。启用该预占的商城订单在发货申请及最终出库前必须有足额已核验真实收款，且扣除已登记退款；没有支付网关验签契约，P0-03 保持未关闭。真实收款登记强制填写 `external_transaction_id`，数据库唯一约束和同内容重试返回原记录；网关回调、乱序事件和模拟付款幂等仍待接入，P1-04 保持未关闭。实现位置：`backend/app/storefront/service.py`、`backend/app/storefront/routes.py`、`backend/app/orders.py`、`backend/app/wms.py`、`backend/app/payment_evidence.py`、迁移 `0048_oms_outbox_foundation.py`。
 
 ## P0：阻断核心闭环
 

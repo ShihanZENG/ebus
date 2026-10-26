@@ -40,6 +40,18 @@
 | LIM-FR-023 诊断证据治理 | 部分 | 部分 | 部分 | 未核验 | 经营生成、采购草稿、业务执行结果在局部模块分开存储，见 `agent_generation.py`、`purchase_agent.py` 和业务单据/审计表；不存在统一 Finding/Proposal/ExecutionReceipt 引用契约。 |
 | LIM-FR-024 运行异常告警 | 未实现 | 未实现 | 未实现 | 未核验 | 未发现错误率/成本告警、Trace 定位、确认/关闭工作流。 |
 
+## 2026-10-26 五大能力增量接入说明
+
+`lim_langgraph_orchestrator.py`、`lim_graphrag.py`、`lim_memory.py`、`lim_execution_guard.py`、`lim_telemetry.py` 已作为算法/沙盘模块加入；`/api/v1/lim/v2/*` 使用现有登录与权限机制，`/lim-workbench` 明确标注沙盘模式。其自带测试验证的是示例数据和进程内状态，不等于 ERP 业务数据或外部服务验收。
+
+| 需求 | 本轮进展 | 仍需完成 |
+|---|---|---|
+| LIM-FR-002 Agent Registry | 保留现有 `lim_registry.py` 为权威注册表；新增编排器使用静态领域节点。 | 将领域 Agent 的版本、能力标签及回滚绑定现有 Registry。 |
+| LIM-FR-003 Workflow | 新增 LangGraph 沙盘编排及冲突仲裁；现有 `lim_workflow.py` 仍负责已登记工作流。 | 将工作流定义、持久任务、人工批准与安全恢复打通。 |
+| LIM-FR-005 State/Checkpoint | 新增进程内版本快照及可选 Redis 缓存。 | PostgreSQL 持久化、安全恢复和副作用幂等；当前仍未实现生产 checkpoint。 |
+| LIM-FR-014 Temporal GraphRAG | 新增带时态字段的示例图谱及检索沙盘。 | 接入真实实体来源、Neo4j、历史版本与授权检索；生产 GraphRAG 未实现。 |
+| LIM-FR-015 Memory/Skills Governance | 新增进程内四层记忆、衰减及 Skill 蒸馏沙盘。 | 持久化、来源证据、召回权限及现有 `lim_skills.py` 审批生命周期联通。 |
+
 ## G1–G4 实施后状态刷新（2026-10-21）
 
 上表保留为 G0 原始基线。下表按 PRD v1.0 与当前仓库证据刷新，阶段标签不等于生产验收；未列出运行环境/供应商/真实业务口径证据的项目仍为“生产未核验”。

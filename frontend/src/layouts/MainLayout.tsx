@@ -47,6 +47,7 @@ const ICONS: Record<string, JSX.Element> = {
   'ai-dashboard': <BarChartOutlined />,
   'ai-task-history': <BarChartOutlined />,
   'lim-console': <ToolOutlined />,
+  'lim-workbench': <RobotOutlined />,
   'lim-model-gateway': <SettingOutlined />,
   'g-lim-operations': <BarChartOutlined />,
   'lim-agent-runtime': <RobotOutlined />,

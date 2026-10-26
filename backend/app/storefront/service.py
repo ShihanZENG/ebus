@@ -2,13 +2,15 @@
 import hashlib
 import hmac
 import json
+import os
 import secrets
+from datetime import timedelta
 from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from .. import models as m, schemas as core_s
-from ..inventory_allocation import available
+from ..inventory_allocation import available, reserve, finish
 from ..orders import validate_order_refs, build_items
 from ..security import token_hash
 from . import models as sm
@@ -16,6 +18,40 @@ from . import models as sm
 
 def money(value):
     return format(Decimal(str(value)), '.2f')
+
+
+def atomic_hold_enabled():
+    return os.getenv('LIM_STOREFRONT_ATOMIC_HOLD', 'false').lower() in ('1', 'true', 'yes', 'on')
+
+
+def release_order_holds(db, order, status='released'):
+    """Release active checkout allocations in the caller's transaction once."""
+    holds = db.scalars(select(sm.StorefrontHold).where(
+        sm.StorefrontHold.order_id == order.id,
+        sm.StorefrontHold.status == 'active').order_by(sm.StorefrontHold.sku_id).with_for_update()).all()
+    for hold in holds:
+        finish(db, hold.warehouse_id, hold.sku_id, 'storefront_hold', order.id)
+        hold.status = status
+    return len(holds)
+
+
+def expire_holds(db, shop):
+    """Sweep expired holds in the caller's transaction."""
+    from .. import oms_state
+    expired = db.scalars(select(sm.StorefrontHold).join(
+        m.SalesOrder, sm.StorefrontHold.order_id == m.SalesOrder.id).where(
+        m.SalesOrder.shop_id == shop.shop_id,
+        sm.StorefrontHold.status == 'active', sm.StorefrontHold.expires_at <= m.now()
+    ).order_by(sm.StorefrontHold.order_id, sm.StorefrontHold.sku_id).with_for_update()).all()
+    expired_orders = 0
+    for order_id in dict.fromkeys(hold.order_id for hold in expired):
+        order = db.get(m.SalesOrder, order_id)
+        if release_order_holds(db, order, status='expired'):
+            expired_orders += 1
+            if order.order_status in ('created', 'confirmed'):
+                oms_state.set_state(db, order, 'order', 'cancelled', source='system',
+                                    message='结账库存预占已过期', idempotency_key=f'hold-expired:{order.id}')
+    return expired_orders
 
 
 def mask_contact(value):
@@ -267,6 +303,8 @@ def quote_checkout(db, payload):
 def checkout(db, payload, key, recovery, customer=None):
     # Serialise demo checkouts and site publication on the site row.
     shop = site(db, lock=True)
+    if atomic_hold_enabled():
+        expire_holds(db, shop)
     if customer and customer.site_id != shop.id:
         raise HTTPException(403, '顾客账号不属于当前商城')
     # Preserve fingerprints of pre-quote pending submissions when optional field is absent.
@@ -297,6 +335,21 @@ def checkout(db, payload, key, recovery, customer=None):
             raise HTTPException(409, '最终金额已变化，请重新核算并确认订单总额')
         order.total_amount, order.discount_amount, order.grand_total = total, money(Decimal(discount) + promo_discount), money(final_grand)
         db.add_all(rows)
+        if atomic_hold_enabled():
+            quantities = {}
+            for item in rows:
+                quantities[item.sku_id] = quantities.get(item.sku_id, 0) + item.quantity
+            for sku_id, quantity in sorted(quantities.items()):
+                try:
+                    reserve(db, shop.warehouse_id, sku_id, shop.shop_id, quantity,
+                            'storefront_hold', order.id, order.source_order_no)
+                except HTTPException as exc:
+                    if exc.status_code == 422:
+                        raise HTTPException(409, '商品可用库存不足，请调整数量') from exc
+                    raise
+                db.add(sm.StorefrontHold(order_id=order.id, warehouse_id=shop.warehouse_id,
+                                         sku_id=sku_id, quantity=quantity, status='active',
+                                         expires_at=m.now() + timedelta(minutes=30)))
         meta = sm.OrderMeta(site_id=shop.id, order_id=order.id, public_id=public_id, access_hash=token_hash(token),
                             address=payload.address.model_dump(), items=snapshots, grand_total=final_grand,
                             promo_code=promo.code if promo else '', discount_amount=promo_discount)
@@ -305,6 +358,25 @@ def checkout(db, payload, key, recovery, customer=None):
             db.add(sm.CustomerOrder(customer_id=customer.id, order_id=order.id))
         db.add(sm.Submission(site_id=shop.id, key=key, request_hash=digest,
                              recovery_hash=token_hash(recovery), order_id=order.id))
+        db.add(m.OmsOutboxEvent(
+            order_id=order.id,
+            event_type='order.created_and_reserved' if atomic_hold_enabled() else 'order.created',
+            contract_version='v1',
+            idempotency_key=f'storefront-order:{order.id}',
+            status='pending',
+            payload={
+                'order_id': order.id,
+                'shop_id': order.shop_id,
+                'warehouse_id': order.warehouse_id,
+                'source_order_no': order.source_order_no,
+                'currency_id': order.currency_id,
+                'grand_total': money(order.grand_total),
+                'items': [{'sku_id': item.sku_id, 'quantity': item.quantity}
+                          for item in rows],
+            },
+            attempt_count=0,
+            last_error='',
+        ))
         db.flush()
         if promo:
             promo.used_count += 1

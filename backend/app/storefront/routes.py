@@ -31,6 +31,18 @@ router.include_router(accounts.router)
 router.include_router(campaigns.router)
 admin_router = APIRouter(prefix='/api/v1/storefront', tags=['独立站运营'], dependencies=[Depends(enabled)])
 admin_router.include_router(campaigns.admin_router)
+
+
+@admin_router.post('/holds/expire')
+def sweep_expired_holds(db=Depends(session_db), user=Depends(require('storefront:write'))):
+    """Worker-callable, scoped sweep for expired checkout allocations."""
+    shop = svc.site(db, lock=True)
+    svc.scope(user, shop)
+    count = svc.expire_holds(db, shop)
+    db.commit()
+    return {'expired_orders': count}
+
+
 MAX_MEDIA_SIZE = 8 * 1024 * 1024
 MAX_SUPPORT_ATTACHMENT_SIZE = 5 * 1024 * 1024
 SUPPORT_ATTACHMENT_TYPES = {'.png': ('image/png', lambda b: b.startswith(b'\x89PNG\r\n\x1a\n') and b[12:16] == b'IHDR'),

@@ -252,14 +252,32 @@ class SalesOrderItem(Record, Base):
     line_total: Mapped[float] = mapped_column(Numeric(12, 2))
 
 
+class OmsOutboxEvent(Record, Base):
+    """ERP-owned handoff event; a worker can retry delivery by event ID."""
+
+    __tablename__ = 'oms_outbox_events'
+    order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), index=True)
+    event_type: Mapped[str] = mapped_column(String(64))
+    contract_version: Mapped[str] = mapped_column(String(16))
+    idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default='pending', index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str] = mapped_column(String(500), default='')
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class PaymentRecord(Record, Base):
     __tablename__ = 'payment_records'
+    __table_args__ = (UniqueConstraint('external_transaction_id', name='uq_payment_records_external_transaction_id'),)
     order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), index=True)
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     fee_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     currency_id: Mapped[str] = mapped_column(ForeignKey('dictionaries.id', ondelete='RESTRICT'))
     method: Mapped[str] = mapped_column(String(40), default='manual')
     source: Mapped[str] = mapped_column(String(120), default='manual')
+    external_transaction_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     record_type: Mapped[str] = mapped_column(String(20), default='legacy')
     reconciliation_status: Mapped[str] = mapped_column(String(20), default='legacy')
     evidence_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

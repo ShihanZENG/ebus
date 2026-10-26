@@ -1,4 +1,5 @@
 """WMS 库存、入库、出库业务逻辑与路由。"""
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, func
@@ -82,6 +83,23 @@ def reserve_order_stock(db, order):
     return shipment
 
 
+def ensure_storefront_payment_gate(db, order):
+    """A hold-enabled Storefront order cannot ship on simulated or unverified money."""
+    from .storefront import models as sm
+    if not db.scalar(select(sm.StorefrontHold.id).where(sm.StorefrontHold.order_id == order.id).limit(1)):
+        return
+    verified = db.scalar(select(func.coalesce(func.sum(m.PaymentRecord.amount), 0)).where(
+        m.PaymentRecord.order_id == order.id,
+        m.PaymentRecord.record_type == 'real',
+        m.PaymentRecord.reconciliation_status == 'verified')) or 0
+    refunds = sum((Decimal(str(case.refund_execution['amount']))
+                   for case in db.scalars(select(m.AfterSale).where(
+                       m.AfterSale.order_id == order.id)).all() if case.refund_execution),
+                  Decimal('0'))
+    if verified - refunds < order.grand_total:
+        raise HTTPException(409, '商城订单缺少已核验的真实付款凭证，不能发货')
+
+
 def release_order_stock(db, order):
     """取消订单时释放已预留库存。"""
     shipment = db.scalar(select(m.ShipmentOrder).where(m.ShipmentOrder.order_id == order.id))
@@ -107,6 +125,8 @@ def ship_order(db, shipment, tracking_no='', remark=''):
     """确认出库：扣减在库和预留，订单履约状态推进为已发货。"""
     if shipment.status not in ('picking', 'packed'):
         raise HTTPException(422, f'出库单状态为 {shipment.status}，不能重复发货')
+    order = db.get(m.SalesOrder, shipment.order_id)
+    ensure_storefront_payment_gate(db, order)
     items = db.scalars(select(m.ShipmentOrderItem).where(m.ShipmentOrderItem.shipment_id == shipment.id)).all()
     for sku_id in sorted({it.sku_id for it in items}):
         from .inventory_allocation import finish

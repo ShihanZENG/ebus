@@ -512,6 +512,21 @@ def approve_order(order_id: str, payload: s.OrderApprove, db=Depends(session_db)
 def request_shipment(order_id: str, payload: s.ShipmentRequest, db=Depends(session_db), user=Depends(require('orders:write'))):
     """提交发货申请：WMS 检查并预留库存，成功后订单进入待仓库拣货状态。"""
     order = get_order_or_404(db, user, order_id, lock=True)
+    if order.source_channel == 'storefront_demo':
+        from .storefront import models as storefront_models
+        from .storefront.service import release_order_holds
+        active = db.scalars(select(storefront_models.StorefrontHold).where(
+            storefront_models.StorefrontHold.order_id == order.id,
+            storefront_models.StorefrontHold.status == 'active').with_for_update()).all()
+        if any(hold.expires_at <= m.now() for hold in active):
+            release_order_holds(db, order, status='expired')
+            if order.order_status in ('created', 'confirmed'):
+                oms_state.set_state(db, order, 'order', 'cancelled', source='system',
+                                    message='结账库存预占已过期',
+                                    idempotency_key=f'hold-expired:{order.id}')
+            db.commit()
+            raise HTTPException(409, '结账库存预占已过期，请重新下单')
+    wms.ensure_storefront_payment_gate(db, order)
     if order.order_status != 'confirmed':
         raise HTTPException(422, f'只有已审核订单可以申请发货，当前状态 {order.status}')
     warehouse_id = payload.warehouse_id or order.warehouse_id
@@ -531,6 +546,10 @@ def request_shipment(order_id: str, payload: s.ShipmentRequest, db=Depends(sessi
     try:
         with db.begin_nested():
             order.warehouse_id = warehouse_id
+
+            if order.source_channel == 'storefront_demo':
+                from .storefront.service import release_order_holds
+                release_order_holds(db, order, status='transferred')
             if payload.remark:
                 order.remark = (order.remark + ' | ' if order.remark else '') + payload.remark
             shipment = wms.reserve_order_stock(db, order)
@@ -566,6 +585,9 @@ def cancel_order(order_id: str, payload: s.OrderCancel, db=Depends(session_db), 
             order.order_status == 'confirmed' and order.fulfillment_status in ('unallocated', 'allocated')):
         raise HTTPException(422, f'只有未发货订单可以取消，当前状态 {order.status}')
     before = order_snapshot(order)
+    if order.source_channel == 'storefront_demo':
+        from .storefront.service import release_order_holds
+        release_order_holds(db, order, status='cancelled')
     # 如果已申请发货（已预留库存），先释放预留
     if order.fulfillment_status == 'allocated':
         wms.release_order_stock(db, order)

@@ -82,6 +82,7 @@ interface PaymentCreateValues {
   fee_amount: number
   method: string
   source: string
+  external_transaction_id?: string
   paid_at?: Dayjs
   remark?: string
 }
@@ -341,6 +342,7 @@ export default function Orders() {
         body.append('currency_id', detail.currency_id)
         body.append('method', values.method)
         body.append('source', values.source)
+        body.append('external_transaction_id', values.external_transaction_id?.trim() ?? '')
         if (values.paid_at) body.append('paid_at', values.paid_at.toISOString())
         body.append('remark', values.remark ?? '')
         body.append('evidence', evidenceFile, evidenceFile.name)
@@ -655,6 +657,9 @@ export default function Orders() {
                   </Form.Item>
                   <Form.Item noStyle shouldUpdate={(before, after) => before.record_type !== after.record_type}>
                     {({ getFieldValue }) => getFieldValue('record_type') === 'real' ? <>
+                      <Form.Item name="external_transaction_id" label="外部交易流水号（真实收款必填）" rules={[{ required: true, whitespace: true, message: '请填写外部交易流水号' }, { max: 120 }]}>
+                        <Input maxLength={120} style={{ width: 320 }} />
+                      </Form.Item>
                       <Form.Item label="平台结算凭据（真实收款必传）">
                         <Upload
                           accept=".pdf,.png,.jpg,.jpeg"
