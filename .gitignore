@@ -1,6 +1,7 @@
 backend/.venv/
 backend/.env
 **/.env
+backend/.neo4j-container.env
 **/.env.*
 !**/.env.example
 **/__pycache__/

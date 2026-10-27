@@ -37,6 +37,14 @@ docker compose -p crossborder-erp up -d db
 
 当前环境的虚拟环境复用了本机已有 Python 依赖，并补装 PostgreSQL 驱动；其他机器按 requirements.txt 安装。
 
+## LIM 业务证据图谱
+
+登录后打开 `/lim-workbench`，选择店铺、仓库、真实 SKU 和日期，运行诊断后进入「图谱与证据」。完整关系图来自 PostgreSQL 中保存的检查点；输入关键词并点击「检索图谱」时，会把当前授权运行的证据同步到 Neo4j，再执行受该运行范围限制的余弦向量和关键词检索。`查看配置状态` 会显示 Neo4j 连接及向量索引是否已就绪。
+
+新机器可在本地启动 Neo4j 5.20，并在未跟踪的 `backend/.env` 中填写与容器一致的 `LIM_NEO4J_URI`、`LIM_NEO4J_USER`、`LIM_NEO4J_PASSWORD`。本机只绑定 `127.0.0.1` 的 7687 和 7474 端口；容器数据卷为 `ebus-lim-neo4j-data`。不要提交密码或容器环境文件。Neo4j 未配置时，完整关系图仍可使用；向量检索会明确返回不可用。
+
+目前向量由本地词元哈希产生，可做词面相似度检索，但同义词语义能力有限。图中的时间是证据观察时间，不能作为业务有效期。
+
 ## 接口文档使用方法
 
 1. POST /api/v1/auth/login，输入本地管理员用户名和密码。

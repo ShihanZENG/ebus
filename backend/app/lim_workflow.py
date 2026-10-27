@@ -352,7 +352,7 @@ def _condition_matches(condition, input_value, outputs):
 
 
 def _safe_tool_result(value, sanitizer):
-    safe = sanitizer(value)
+    safe = _sanitize_workflow_payload(value, sanitizer)
     if isinstance(value, dict) and isinstance(safe, dict):
         refs = value.get('evidence_refs')
         safe_refs = safe.get('evidence_refs')
@@ -360,6 +360,12 @@ def _safe_tool_result(value, sanitizer):
             for index, ref in enumerate(refs[:len(safe_refs)]):
                 if not isinstance(ref, dict) or not isinstance(safe_refs[index], dict):
                     continue
+                # Server-generated digests are identifiers, not phone numbers.
+                # Preserve only canonical hex values, never arbitrary strings.
+                for key, length in (('content_hash', 64), ('ref_id', 32)):
+                    digest = ref.get(key)
+                    if isinstance(digest, str) and re.fullmatch('[a-f0-9]{' + str(length) + '}', digest):
+                        safe_refs[index][key] = digest
                 observed_at = ref.get('observed_at')
                 try:
                     datetime.fromisoformat(str(observed_at).replace('Z', '+00:00'))

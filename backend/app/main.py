@@ -40,6 +40,9 @@ from .listing_agent import router as listing_agent_router
 from .portal import router as portal_router
 from .lim_routes import router as lim_router
 from .lim_enterprise_routes import router as lim_enterprise_router
+from .lim_live import router as lim_live_router
+from . import lim_live_views  # noqa: F401 - register persisted evidence views
+from . import lim_live_connections  # noqa: F401 - explicit external adapters
 from .reconciliation_prep import router as reconciliation_prep_router
 from .oms_routing import router as oms_routing_router
 from .oms_exceptions import router as oms_exceptions_router
@@ -140,6 +143,7 @@ def create_app(engine=None, *, storefront_enabled=False):
     app.include_router(decision_center_router)
     app.include_router(lim_router)
     app.include_router(lim_enterprise_router)
+    app.include_router(lim_live_router)
     app.include_router(portal_router)
     admin = APIRouter(prefix='/api/v1', tags=['账号与角色'])
 

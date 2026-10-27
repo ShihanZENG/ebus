@@ -4,6 +4,30 @@ from test_erp import setup, create_user
 from test_oms import demo_basics
 
 
+def test_live_workbench_runs_real_registry_and_scoped_views(setup):
+    client, auth, _ = setup
+    shop, warehouse, _, _ = demo_basics(client, auth)
+    base = '/api/v1/lim/v2/live'
+    assert client.post(base + '/install').status_code == 401
+    response = client.post(base + '/install', headers=auth)
+    assert response.status_code == 200, response.text
+    response = client.post(base + '/runs', headers=auth, json={
+        'shop_id': shop['id'], 'warehouse_id': warehouse['id'], 'sku_codes': ['SKU-UK-DRESS-001'],
+        'date_from': '2026-10-01', 'date_to': '2026-10-27'})
+    assert response.status_code == 200, response.text
+    run_id = response.json()['run_id']
+    path = base + '/runs/' + run_id
+    response = client.post(path + '/resume', headers=auth)
+    assert response.status_code == 200, response.text
+    assert response.json()['status'] == 'COMPLETED'
+    for suffix in ('', '/memory', '/graph', '/execution'):
+        response = client.get(path + suffix, headers=auth)
+        assert response.status_code == 200, response.text
+        assert client.get(path + suffix).status_code == 401
+    _, other = create_user(client, auth, shop_scope=[shop['id']], warehouse_scope=[warehouse['id']])
+    assert client.get(path, headers=other).status_code in (403, 404)
+
+
 def test_v2_orchestration_requires_login_and_business_scope(setup):
     client, auth, _ = setup
     shop, warehouse, _, _ = demo_basics(client, auth)

@@ -6,6 +6,7 @@ from app.storefront import models as storefront_models  # noqa: F401
 from app import ads_reports, business_analysis  # noqa: F401
 from app import agent_generation  # noqa: F401
 from app import lim_models  # noqa: F401 - register LIM tables
+from app import lim_live_models  # noqa: F401 - durable live execution
 from app import decision_models  # noqa: F401 - register business risk and strategy tables
 from app import sales_coverage_evidence  # noqa: F401
 from app import listing_agent  # noqa: F401

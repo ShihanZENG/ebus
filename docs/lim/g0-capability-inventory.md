@@ -70,8 +70,8 @@
 | LIM-FR-010 幂等/失败核对 | 部分（既有业务局部能力） | `purchase_agent.py`, `after_sales_execution.py`; related tests | LIM 暂不运行写 Tool；通用写协议、外部回读/RECONCILING 未实现。 |
 | LIM-FR-011 AI Gateway | 部分（现有模型客户端） | `supply_agent_llm.py`, current Agent modules | 无统一 Model Registry、策略路由、配额、熔断、成本标签、托管密钥/供应商配置。 |
 | LIM-FR-012 检索源/元数据 | 部分实现/联通/验收 | `lim_knowledge.py`, migration `0031`; Knowledge tab; `test_lim_knowledge.py` | 当前治理本地 Markdown；ERP 结构化源和其他知识类型需逐源契约与 ACL。 |
-| LIM-FR-013 Hybrid/Agentic Retrieval | 部分（词面检索） | `assistant_knowledge.py`, `lim_knowledge.py` | 无向量/混合召回、分路得分和固定检索 Golden Dataset 指标。 |
-| LIM-FR-014 Temporal GraphRAG | 未实现 | 当前无图实体/时态关系/多跳查询服务 | 等业务 Owner 提供实体键、关系方向/口径、valid-time 与历史数据来源，再实现可追溯图查询。 |
+| LIM-FR-013 Hybrid/Agentic Retrieval | 部分（真实运行范围内向量+关键词） | `lim_live_connections.py`：Neo4j 余弦向量、关键词排序及 RRF；`GraphEvidenceCanvas.tsx` 显示来源和得分 | 使用本地词元哈希，尚非语义模型；未做跨源动态规划和固定 Golden Dataset 评测。 |
+| LIM-FR-014 Temporal GraphRAG | 部分（真实业务证据关系和观察快照） | `lim_live_views.py` 从 ERP Checkpoint 派生实体和业务关系；Neo4j 可检索已授权运行；`0049` 持久化 | 时间依据为观察时间，不代表业务 valid-time；尚无跨运行版本窗口和通用多跳推理，不能标注完整实现。 |
 | LIM-FR-015 Memory/Skills Governance | 部分（Skill 治理基础已实现/联通/聚焦验收） | `lim_skills.py`, migration `0034`, Skill Console tab, `test_lim_skills.py`；候选仅收受控模板、引用和范围元数据 | Skill lifecycle 不自动写入长期 Memory/提示词；长期记忆来源、召回权限、校准集及实际使用回执仍缺。 |
 | LIM-FR-016 Trace Explorer | 部分实现/联通/验收 | `LimRun/LimSpan/LimToolInvocation`, `lim_workflow.py`; trace APIs/UI | 缺模型 span/cost 完整性、跨 Agent 查询过滤、脱敏 JSON 导出和 retention controls。 |
 | LIM-FR-017 Evaluation Lab | 部分实现/联通/聚焦验收 | 固定数据集与 Agent 版本的离线 Eval；已有 Eval Run 固定版本比较、逐例确定性差异、可配置阈值报告和 SHA-256 完整性校验 | 只覆盖本地 PASS/FAIL/NOT_EVALUATED 断言、失败码、风险等级、耗时和脱敏输出；没有 PRD 指标全集、真实模型固定 Prompt/参数报告或生产发布门禁。 |
