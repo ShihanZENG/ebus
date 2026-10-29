@@ -201,20 +201,15 @@ def neo4j_read(run_id: str, db=Depends(session_db), user=Depends(require('assist
 def export_telemetry(db, live, service):
     calls = db.scalars(select(lm.LimToolInvocation).where(lm.LimToolInvocation.run_id.in_(live.child_run_ids))).all()
     if service == 'langfuse':
+        from . import models as m
+        from .lim_live_observability import read_observability, send_langfuse
         from langfuse import Langfuse
         client = Langfuse(host=os.environ['LIM_LANGFUSE_HOST'], public_key=os.environ['LIM_LANGFUSE_PUBLIC_KEY'],
                          secret_key=os.environ['LIM_LANGFUSE_SECRET_KEY'], timeout=5)
         if not client.auth_check():
             raise RuntimeError('Langfuse authentication failed')
-        trace = client.trace(id=live.id, name='lim-five-domains-live', metadata={'workflow_run_id': live.workflow_run_id})
-        for call in calls:
-            trace.span(id=call.invocation_id, name=call.tool_id,
-                start_time=call.created_at.replace(tzinfo=timezone.utc),
-                end_time=call.updated_at.replace(tzinfo=timezone.utc),
-                metadata={'status': call.status, 'elapsed_ms': call.elapsed_ms, 'tool_version': call.tool_version})
-        client.flush()
-        # SDK batches asynchronously: flushing is not a read-back verification.
-        return {'service': service, 'status': 'submitted', 'span_count': len(calls), 'readback_verified': False}
+        report = read_observability(db, db.get(m.User, live.actor_id), live.id)
+        return send_langfuse(report, client)
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExportResult
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -248,12 +243,25 @@ def export_route(run_id: str, service: str, db=Depends(session_db), user=Depends
         raise HTTPException(404, '服务不存在')
     if not configured(service):
         raise HTTPException(503, f'{service} 未配置；保留数据库记录，不发送外部请求')
+    if service in {'langfuse', 'otel'}:
+        from .lim_live_models import LiveEvaluation
+        from .lim_live_observability import persist_evaluation
+        saved = db.scalar(select(LiveEvaluation).where(LiveEvaluation.run_id == run_id))
+        if saved is None:
+            saved = persist_evaluation(db, run_id)
+    if service == 'langfuse':
+        previous = (saved.delivery or {}).get('langfuse') if saved else None
+        if previous and previous.get('status') == 'submitted':
+            return {**previous, 'status': 'already_submitted'}
     try:
         result = export_graph(db, user, run_id) if service == 'neo4j' else export_telemetry(db, live, service)
     except Exception:
         record_audit(db, user, 'lim_live_runs', run_id, 'export_failed', after={'service': service})
         db.commit()
         raise HTTPException(503, f'{service} 导出失败；数据库证据仍然可用') from None
+    if service != 'neo4j':
+        from .lim_live_observability import mark_delivery
+        mark_delivery(db, run_id, service, result)
     record_audit(db, user, 'lim_live_runs', run_id, 'export', after=result)
     db.commit()
     return result

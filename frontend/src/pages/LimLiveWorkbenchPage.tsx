@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Form, Input, Select, Space, Statistic, Table, Tabs, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Form, Input, Select, Space, Statistic, Table, Tabs, Tag, Timeline, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import { request } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,7 +9,10 @@ type Option = { id: string; code: string; name: string }
 type Evidence = { ref_id: string; source: string; claim_key: string; value: unknown; unit: string; subject: Record<string, unknown>; observed_at: string }
 type Task = { domain: string; status: string; child_run_id: string; attempts: number; error_code?: string; result: { evidence_refs?: Evidence[]; gaps?: string[] } }
 type Run = { run_id: string; workflow_run_id: string; status: string; tasks: Task[]; findings: { code: string; sku_code: string; recommendation: string }[]; telemetry: { tool_calls: number; successful_tool_calls: number; elapsed_ms: number } }
+type Metric = { value: number | null; numerator: number | null; denominator: number | null; basis: string; state: string; note?: string | null }
+type Observation = { run_id: string; trace_id: string; status: string; started_at: string | null; finished_at: string | null; persisted: boolean; evaluation_version: number; metrics: Record<string, Metric>; usage: { token_count: number | null; cost_usd: number | null; basis: string }; delivery: Record<string, { status: string; readback_verified?: boolean }>; steps: { domain: string; status: string; started_at: string | null; finished_at: string | null; attempt_count: number; error_code: string | null; evidence: { ref_id: string; claim_key: string; source: string }[]; tool: { invocation_id: string; tool_id: string; status: string; elapsed_ms: number | null; error_code: string | null } | null }[] }
 const names: Record<string, string> = { product: '商品', inventory: '库存', procurement: '采购', advertising: '广告', finance: '财务' }
+const metricNames: Record<string, string> = { task_success_rate: '任务完成率', evidence_faithfulness: '证据忠实度', tool_call_accuracy: '工具调用准确率', safety_violation_rate: '安全策略拦截率' }
 const pretty = (value: unknown) => JSON.stringify(value, null, 2)
 const today = new Date().toISOString().slice(0, 10)
 
@@ -22,6 +25,7 @@ export default function LimLiveWorkbenchPage() {
   const [run, setRun] = useState<Run | null>(null)
   const [view, setView] = useState<unknown>(null)
   const [graphData, setGraphData] = useState<GraphPayload | null>(null)
+  const [observability, setObservability] = useState<Observation | null>(null)
   const [tab, setTab] = useState('orchestration')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -49,6 +53,9 @@ export default function LimLiveWorkbenchPage() {
       ? await request<GraphPayload>(`${path}/search`, { method: 'POST', body: { query: query.trim() } })
       : await request<GraphPayload>(path)
     setGraphData(result)
+  })
+  const readObservability = () => work(async () => {
+    setObservability(await request<Observation>(`/lim/v2/live/runs/${encodeURIComponent(runId)}/observability`))
   })
   const options = (rows: Option[]) => rows.map(row => ({ value: row.id, label: `${row.code} · ${row.name}` }))
   const columns = [
@@ -89,7 +96,7 @@ export default function LimLiveWorkbenchPage() {
       <Statistic title="工具调用" value={run.telemetry.tool_calls} /><Statistic title="成功调用" value={run.telemetry.successful_tool_calls} />
       <Statistic title="工具耗时" value={run.telemetry.elapsed_ms} suffix="ms" />
       <Typography.Text type="secondary">Workflow：{run.workflow_run_id}</Typography.Text></Space></Card>}
-    <Card><Tabs activeKey={tab} onChange={value => { setTab(value); setView(null) }} items={[
+    <Card><Tabs activeKey={tab} onChange={value => { setTab(value); setView(null); if (value === 'telemetry' && runId) void readObservability() }} items={[
       { key: 'orchestration', label: '五领域编排', children: <Space direction="vertical" style={{ width: '100%' }}>{run?.tasks.map(task => <Card key={task.domain} size="small" title={<Space>{names[task.domain]}<Tag color={task.status === 'COMPLETED' ? 'green' : 'orange'}>{task.status}</Tag></Space>}>
         {task.error_code && <Alert type="error" message={task.error_code} />}
         {task.result.gaps?.map((gap, i) => <Alert key={i} type="info" message={gap} style={{ marginBottom: 8 }} />)}
@@ -108,7 +115,33 @@ export default function LimLiveWorkbenchPage() {
         <Button disabled={!runId || busy || !canManage} onClick={() => void readView('memory/archive-decayed', 'POST')}>归档低保留权重记忆</Button>
         <Typography.Text type="secondary">候选须审核，不自动激活；衰减权重不是事实正确率。</Typography.Text></Space> },
       { key: 'execution', label: '业务执行门禁', children: <Space direction="vertical"><Typography.Paragraph>检查所选店铺与仓库最近 20 个订单的 Hold、付款门禁和 OMS Outbox。独立 OMS 尚未联调。</Typography.Paragraph><Button disabled={!runId || busy} onClick={() => void readView('execution')}>读取真实订单门禁</Button></Space> },
-      { key: 'telemetry', label: '运行追踪与评测', children: <Space direction="vertical"><Typography.Paragraph>指标来自保存的工具调用。确定性诊断没有 LLM Token、美元成本或忠实度分数；外部可观测平台尚未验收。</Typography.Paragraph>{run && <pre>{pretty(run.telemetry)}</pre>}</Space> },
+      { key: 'telemetry', label: '运行追踪与评测', children: <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Typography.Paragraph>追踪来自已保存的 Workflow、子 Run 和工具调用。指标显示计算依据；无模型生成时，Token、成本和证据忠实度标为暂不适用。</Typography.Paragraph>
+        <Button disabled={!runId || busy} onClick={() => void readObservability()}>刷新运行追踪</Button>
+        {observability?.run_id === runId && <>
+          <Space wrap><Tag color={observability.status === 'COMPLETED' ? 'green' : 'orange'}>{observability.status}</Tag><Typography.Text copyable={{ text: observability.trace_id }}>Trace {observability.trace_id}</Typography.Text><Typography.Text type="secondary">评测版本 {observability.evaluation_version} · {observability.persisted ? '已保存' : '历史运行即时计算'}</Typography.Text></Space>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, width: '100%' }}>
+            {Object.entries(observability.metrics).map(([key, metric]) => <Card key={key} size="small" title={metricNames[key] || key}>
+              <Typography.Title level={3} style={{ margin: 0 }}>{metric.value === null ? '暂不适用' : `${Math.round(metric.value * 100)}%`}</Typography.Title>
+              {metric.denominator !== null && <Typography.Text type="secondary">{metric.numerator}/{metric.denominator}</Typography.Text>}
+              <Typography.Paragraph style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>{metric.basis}</Typography.Paragraph>
+              {metric.note && <Typography.Text type="secondary" style={{ fontSize: 12 }}>{metric.note}</Typography.Text>}
+            </Card>)}
+          </div>
+          <Card size="small" title="执行时间线"><Timeline items={observability.steps.map(step => ({ color: step.status === 'COMPLETED' ? 'green' : step.status === 'FAILED' ? 'red' : 'gray', children: <div style={{ minWidth: 0 }}>
+            <Space wrap><strong>{names[step.domain] || step.domain}</strong><Tag color={step.status === 'COMPLETED' ? 'green' : step.status === 'FAILED' ? 'red' : 'default'}>{step.status}</Tag><Typography.Text type="secondary">尝试 {step.attempt_count} 次</Typography.Text></Space>
+            <div style={{ overflowWrap: 'anywhere' }}>{step.tool ? `${step.tool.tool_id} · ${step.tool.elapsed_ms ?? '—'} ms · ${step.tool.status}` : '尚无工具调用'}{step.error_code ? ` · ${step.error_code}` : ''}</div>
+            <Typography.Text type="secondary">{step.started_at || '尚未开始'} → {step.finished_at || '尚未结束'} · 证据 {step.evidence.length} 条</Typography.Text>
+            {step.evidence.length > 0 && <details><summary>查看证据引用</summary><ul>{step.evidence.map(ref => <li key={ref.ref_id} style={{ overflowWrap: 'anywhere' }}>{ref.claim_key} · {ref.source} · {ref.ref_id}</li>)}</ul></details>}
+          </div> }))} /></Card>
+          <Card size="small" title="模型用量与外部发送"><Space direction="vertical">
+            <Typography.Text>Token：{observability.usage.token_count ?? '暂不适用'} · 成本：{observability.usage.cost_usd === null ? '暂不适用' : `$${observability.usage.cost_usd}`}</Typography.Text>
+            <Typography.Text type="secondary">{observability.usage.basis}</Typography.Text>
+            <Typography.Text>OpenTelemetry：{observability.delivery.otel?.status || '未配置或未发送'} · Langfuse：{observability.delivery.langfuse?.status || '未配置或未发送'}</Typography.Text>
+            <Typography.Text type="secondary">“已发送”仅表示客户端提交，接收平台是否展示仍需在平台内核验。</Typography.Text>
+          </Space></Card>
+        </>}
+      </Space> },
     ]} /></Card>
     <Card size="small" title="外部服务连接"><Space wrap>
       <Button disabled={busy} onClick={() => void work(async () => setView(await request('/lim/v2/live/connections')))}>查看配置状态</Button>

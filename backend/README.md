@@ -45,6 +45,14 @@ docker compose -p crossborder-erp up -d db
 
 目前向量由本地词元哈希产生，可做词面相似度检索，但同义词语义能力有限。图中的时间是证据观察时间，不能作为业务有效期。
 
+## LIM 运行追踪与评测
+
+`/api/v1/lim/v2/live/runs/{run_id}/observability` 按当前身份和业务范围读取五领域运行时间线。任务完成率、预期工具匹配率、安全策略拦截率均附计算分子、分母和依据；当前确定性诊断没有模型生成，证据忠实度和 Token/美元成本显示为“暂不适用”。新运行会保存版本化评测快照；历史运行可从已保存的 Workflow/Tool 记录即时计算。工作台「运行追踪与评测」页可查看步骤、证据引用与外部发送状态。
+
+配置 `LIM_OTEL_TRACES_ENDPOINT` 后，运行时会生成父 Run 和五领域子 Span，并通过 OTLP HTTP 发送。开发环境可使用本机 Jaeger：`docker run -d --name ebus-lim-jaeger -p 127.0.0.1:16686:16686 -p 127.0.0.1:4318:4318 cr.jaegertracing.io/jaegertracing/jaeger:2.22.0`，然后在未跟踪的 `.env` 中设置 `LIM_OTEL_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces` 并重启后端。Jaeger 界面为 http://127.0.0.1:16686；该开发容器使用内存存储，重启后 Trace 会消失，业务记录仍在 PostgreSQL。
+
+配置 `LIM_LANGFUSE_HOST`、`LIM_LANGFUSE_PUBLIC_KEY`、`LIM_LANGFUSE_SECRET_KEY` 后，完成的运行会向 Langfuse 提交同一运行 ID 的领域步骤与适用评分。只发送领域、状态、耗时、证据数量等元数据，不发送 SKU、业务数值、原始提示词或客户资料。外部服务不可用时不会撤销 ERP 运行；可在连接面板手动重试。`submitted` 表示客户端提交，接收平台的实际展示仍须在其界面核对。不要将真实密钥提交到仓库。
+
 ## 接口文档使用方法
 
 1. POST /api/v1/auth/login，输入本地管理员用户名和密码。

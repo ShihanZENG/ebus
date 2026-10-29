@@ -158,6 +158,7 @@ def execute(sessions, run_id, actor_id):
     # A lease fences concurrent/resumed execution. Tools are read-only, so a crash
     # before checkpoint commit may safely replay that node; completed nodes never replay.
     from langgraph.graph import StateGraph, START, END
+    from .lim_live_observability import run_span, domain_span, persist_evaluation, publish_configured
     token = str(uuid4())
     with sessions() as db:
         live, parent = authorized_run(db, db.get(m.User, actor_id), run_id)
@@ -192,7 +193,13 @@ def execute(sessions, run_id, actor_id):
                     return {'completed': state['completed'] + 1}
                 arguments = parent.input_summary
             node = next(node for node in definition()['tasks'] if node['node_id'] == domain)
-            result = _execute_workflow_task(sessions, actor_id, workflow_run_id, node, arguments)
+            with domain_span(run_id, domain) as trace_span:
+                result = _execute_workflow_task(sessions, actor_id, workflow_run_id, node, arguments)
+                trace_span.set_attribute('lim.evidence_count', len((result.get('result') or {}).get('evidence_refs', [])))
+                trace_span.set_attribute('lim.domain_status', result['status'])
+                if result['status'] != 'COMPLETED':
+                    from opentelemetry.trace import Status, StatusCode
+                    trace_span.set_status(Status(StatusCode.ERROR, result.get('error_code') or 'LIVE_DOMAIN_FAILED'))
             with sessions() as db:
                 # Lock/fence before writing the task and checkpoint together.
                 changed = db.execute(update(LiveRun).where(LiveRun.id == run_id, LiveRun.lease_token == token)
@@ -229,7 +236,8 @@ def execute(sessions, run_id, actor_id):
         previous = domain
     graph.add_edge(previous, END)
     try:
-        graph.compile().invoke({'completed': 0})
+        with run_span(run_id, workflow_run_id):
+            graph.compile().invoke({'completed': 0})
         with sessions() as db:
             live, parent = authorized_run(db, db.get(m.User, actor_id), run_id)
             if live.lease_token != token:
@@ -237,14 +245,21 @@ def execute(sessions, run_id, actor_id):
             parent.status, parent.finished_at = 'COMPLETED', m.now()
             parent.error_code = None
             parent.output_summary = {'mode': 'live', 'checkpoint_count': 5}
+            db.flush()
+            persist_evaluation(db, run_id)
             db.commit()
+        publish_configured(sessions, run_id)
     except Exception:
         with sessions() as db:
             live = db.get(LiveRun, run_id)
             if live.lease_token == token:
                 parent = db.scalar(select(lm.LimWorkflowRun).where(lm.LimWorkflowRun.workflow_run_id == workflow_run_id))
                 parent.status, parent.error_code = 'FAILED', 'LIVE_NODE_FAILED'
+                parent.finished_at = m.now()
+                db.flush()
+                persist_evaluation(db, run_id)
                 db.commit()
+        publish_configured(sessions, run_id)
         raise
     finally:
         with sessions() as db:

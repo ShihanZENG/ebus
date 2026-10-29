@@ -43,6 +43,7 @@ from .lim_enterprise_routes import router as lim_enterprise_router
 from .lim_live import router as lim_live_router
 from . import lim_live_views  # noqa: F401 - register persisted evidence views
 from . import lim_live_connections  # noqa: F401 - explicit external adapters
+from . import lim_live_observability  # noqa: F401 - authorized live trace and evaluation
 from .reconciliation_prep import router as reconciliation_prep_router
 from .oms_routing import router as oms_routing_router
 from .oms_exceptions import router as oms_exceptions_router

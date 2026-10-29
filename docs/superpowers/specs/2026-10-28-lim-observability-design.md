@@ -1,0 +1,9 @@
+# LIM live observability design
+
+Goal: make a five-domain live run explainable from persisted ERP evidence, and send the same run to configured OpenTelemetry and Langfuse receivers.
+
+The application database remains the authoritative record. Each live run exposes a timeline built from the existing Workflow tasks, child Runs, Spans, and ToolInvocations. A versioned evaluation snapshot is saved at completion. Metrics carry a numerator, denominator, basis, and applicability state; missing LLM generation, model usage, or business outcome must never be represented as zero or as a successful score. Trace responses and external exports include only IDs, domain names, statuses, durations, evidence counts and hashes, never raw business values or credentials. Existing run authorization and current shop/warehouse scope checks apply to every read and export.
+
+OpenTelemetry creates a parent span for a live execution and child spans for each domain while execution happens. A configured OTLP endpoint receives them without affecting the business transaction when unavailable. Langfuse receives the same run ID, steps and applicable evaluation scores after database commit. Publishing is best effort, repeatable for historical runs, and records delivery status without changing run status. The workbench displays the saved timeline, metric definitions and external delivery state. External receivers are optional; their absence is reported explicitly.
+
+Acceptance: a completed real run yields five ordered domain observations and persisted, defensible metrics; a failed run shows a failing step; resumed completed steps are not duplicated; a second user or revoked scope cannot read the trace; an in-memory OTel exporter proves parent-child spans; a fake Langfuse client proves metadata-only export; frontend build and browser flow succeed.

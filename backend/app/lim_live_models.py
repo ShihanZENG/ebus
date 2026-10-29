@@ -34,3 +34,12 @@ class LiveMemory(m.Record, m.Base):
     tier: Mapped[str] = mapped_column(String(16))
     content: Mapped[dict] = mapped_column(JSON)
     archived: Mapped[bool] = mapped_column(default=False)
+
+
+class LiveEvaluation(m.Record, m.Base):
+    __tablename__ = 'lim_live_evaluations'
+    run_id: Mapped[str] = mapped_column(ForeignKey('lim_live_runs.id'), unique=True, index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    metrics: Mapped[dict] = mapped_column(JSON)
+    usage: Mapped[dict] = mapped_column(JSON)
+    delivery: Mapped[dict] = mapped_column(JSON, default=dict)
