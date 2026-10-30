@@ -19,7 +19,7 @@ from ..security import session_db, require, record_audit, bearer, token_hash
 from ..config import ROOT
 from ..intent import INTENT_OTHER, INTENT_PRODUCT, INTENT_LOGISTICS, INTENT_RETURN, rule_based_classify
 from . import models as sm, schemas as s, service as svc
-from . import accounts, campaigns
+from . import accounts, campaigns, assistant
 
 
 def enabled(request: Request):
@@ -30,6 +30,7 @@ def enabled(request: Request):
 router = APIRouter(prefix='/api/storefront/v1', tags=['顾客商城（演示）'], dependencies=[Depends(enabled)])
 router.include_router(accounts.router)
 router.include_router(campaigns.router)
+router.include_router(assistant.router)
 admin_router = APIRouter(prefix='/api/v1/storefront', tags=['独立站运营'], dependencies=[Depends(enabled)])
 admin_router.include_router(campaigns.admin_router)
 
@@ -125,7 +126,8 @@ def install_guards(app):
             request._body = b''.join(chunks)
         if path.startswith('/api/storefront/') or path == '/api/v1/storefront/media':
             now = monotonic()
-            mode = ('auth' if path in ('/api/storefront/v1/account/login', '/api/storefront/v1/account/register') else
+            mode = ('auth' if path in ('/api/storefront/v1/account/login', '/api/storefront/v1/account/register',
+                                     '/api/storefront/v1/assistant/ask') else
                     'media' if path == '/api/v1/storefront/media' else
                     'checkout' if path.endswith('/checkout') else
                     'credentials' if path.startswith('/api/storefront/v1/orders/')

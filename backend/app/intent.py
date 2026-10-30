@@ -92,7 +92,7 @@ _KEYWORD_RULES = [
     (INTENT_REFUND, ('退款', '退钱', 'refund')),
     (INTENT_EXCHANGE, ('换货', '换一个', 'exchange')),
     (INTENT_CANCEL, ('取消订单', '取消这个单', '取消', 'cancel')),
-    (INTENT_LOGISTICS, ('物流', '快递', '到哪', '运单', 'tracking', '发货了吗', '什么时候到')),
+    (INTENT_LOGISTICS, ('物流', '快递', '到哪', '运单', 'tracking', '发货了吗', '什么时候到', '配送', '运费', 'shipping', 'delivery')),
     (INTENT_COMPLAINT, ('投诉', '差评', '投诉你', 'complain')),
     (INTENT_INVOICE, ('发票', '凭证', 'invoice')),
     (INTENT_PRODUCT, ('怎么用', '什么材质', '有货吗', '尺寸', '尺码', 'size guide')),

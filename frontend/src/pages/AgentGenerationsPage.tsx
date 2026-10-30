@@ -14,7 +14,7 @@ const help: Record<Kind, string> = {
   profit: '利润行 JSON：每行包含 source_event_id、category、amount；平台实际从结算中扣除的费用另标 settlement_deducted=true。',
   ads: '广告行 JSON：每行包含 source_row_id、campaign_id、attribution_window_days、impressions、clicks、spend、attributed_orders、attributed_sales。',
   customer: '从真实工单生成回复草稿。仅使用管理员发布且匹配店铺市场、类目和生效日的规则。',
-  rules: '管理员维护规则。applicable_roles 可填写角色代码数组；留空数组表示适用于全部有权客服角色。',
+  rules: '管理员维护规则。applicable_roles 留空仅适用于有权客服角色；若要让登录的独立站顾客看到此规则，须明确加入 storefront_customer，并确认正文可对外公开。',
 }
 
 export default function AgentGenerationsPage() {

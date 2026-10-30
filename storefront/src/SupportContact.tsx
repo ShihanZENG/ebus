@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
-import { errorText, request } from './customer-api'
+import { errorText, request, type Customer } from './customer-api'
+import SmartSupport from './SmartSupport'
 import './support-contact.css'
 
 type ProductContext = { slug: string; title: string }
@@ -19,11 +20,14 @@ const SupportContact = forwardRef<SupportContactHandle, {
   onOrders: () => void
   onSubmitted: () => void
   preview: boolean
-}>(function SupportContact({ order, onOrders, onSubmitted, preview }, ref) {
+  customer: Customer | null
+  onLogin: () => void
+}>(function SupportContact({ order, onOrders, onSubmitted, preview, customer, onLogin }, ref) {
   const dialog = useRef<HTMLDialogElement>(null)
   const pending = useRef(false)
   const [product, setProduct] = useState<ProductContext | null>(null)
   const [mode, setMode] = useState<'presales' | 'order'>('presales')
+  const [supportMode, setSupportMode] = useState<'ai' | 'human'>('human')
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [issue, setIssue] = useState('delivery')
@@ -50,6 +54,7 @@ const SupportContact = forwardRef<SupportContactHandle, {
     if (pending.current) return
     setProduct(context ?? null)
     setMode(!context && order ? 'order' : 'presales')
+    setSupportMode(customer ? 'ai' : 'human')
     setError(''); setTicket(''); setMessage(''); setReceiptStatus(''); setReceiptReply(''); setReceiptError('')
     dialog.current?.showModal()
   }
@@ -81,16 +86,18 @@ const SupportContact = forwardRef<SupportContactHandle, {
   }
 
   return <>
-    <button className="support-launcher" onClick={() => open()} aria-label="联系客服，打开留言咨询">
+    <button className="support-launcher" onClick={() => open()} aria-label="联系客服，打开智能客服与留言咨询">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H4l-2 2V11.5a9 9 0 0 1 18 0Z"/><path d="M7 10h8M7 14h5"/></svg>
-      <span>联系客服<small>留言咨询</small></span>
+      <span>联系客服<small>智能问答 / 留言</small></span>
     </button>
     <dialog ref={dialog} className="support-dialog" aria-labelledby="support-title" onCancel={e => { if (busy) e.preventDefault() }}>
       <button className="support-close" aria-label="关闭客服咨询" disabled={busy} onClick={() => dialog.current?.close()}>×</button>
       <p className="eyebrow">CUSTOMER CARE</p>
       <h2 id="support-title">有什么可以帮你？</h2>
-      <p className="support-hint">留言咨询，非即时聊天。提交后由客服人员查看处理。</p>
+      <p className="support-hint">智能客服检索已公开资料后回答；需要处理订单或资料不足时可转人工。</p>
       {preview && <p role="status">当前为视觉预览，暂不支持提交留言。</p>}
+      {customer && !preview ? <div className="support-mode-switch"><button type="button" aria-pressed={supportMode === 'ai'} onClick={() => setSupportMode('ai')}>智能客服</button><button type="button" aria-pressed={supportMode === 'human'} onClick={() => setSupportMode('human')}>人工留言</button></div> : !preview && <p className="support-hint">登录后可使用智能客服。<button type="button" onClick={() => { dialog.current?.close(); onLogin() }}>前往登录</button></p>}
+      {supportMode === 'ai' && customer && !preview ? <SmartSupport productSlug={product?.slug} onHandoff={question => { setMessage(question); setSupportMode('human') }} /> : <>
       {ticket ? <div role="status" className="support-success"><h3>留言已提交</h3><p>请求编号：<strong>{ticket}</strong></p><p>可在本浏览器内查询客服回复。当前为演示环境，不会自动发送邮件。</p><button onClick={() => dialog.current?.close()}>完成</button></div> : <form onSubmit={submit}>
         <fieldset disabled={busy || preview}>
           {order && !product && <label>咨询范围<select value={mode} onChange={e => setMode(e.target.value as 'presales' | 'order')}><option value="order">当前订单</option><option value="presales">售前 / 其他咨询</option></select></label>}
@@ -106,6 +113,7 @@ const SupportContact = forwardRef<SupportContactHandle, {
         </fieldset>
       </form>}
       {receipt && !preview && <section className="support-success" aria-label="最近一次售前咨询"><p>最近一次售前咨询：<strong>{receipt.ticket_ref}</strong></p><button type="button" disabled={busy} onClick={() => void checkReceipt(receipt)}>查询处理进度</button>{receiptError && <p role="alert" className="support-error">{receiptError}</p>}{receiptStatus && <p role="status">处理状态：{receiptStatus}</p>}{receiptReply && <p>客服回复：{receiptReply}</p>}</section>}
+      </>}
     </dialog>
   </>
 })

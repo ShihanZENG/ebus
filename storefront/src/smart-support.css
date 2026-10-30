@@ -1,0 +1,8 @@
+.smart-support-turns{max-height:320px;overflow-y:auto;margin:14px 0;padding:4px}
+.smart-support-turn{padding:12px 14px;margin:10px 0;background:#f6f4ed;border-radius:8px;line-height:1.6}
+.smart-support-turn p{margin:6px 0}
+.smart-support-question{color:#41543e}
+.smart-support-turn small,.smart-support-sources{color:#586956;font-size:13px}
+.smart-support-turn button{margin-top:8px}
+.support-mode-switch{display:flex;gap:8px;margin:16px 0}
+.support-mode-switch button[aria-pressed="true"]{background:#334d38;color:white}

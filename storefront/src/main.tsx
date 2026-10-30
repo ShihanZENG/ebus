@@ -640,7 +640,8 @@ function App() {
       <p role="status">当前状态：{analyticsConsent === 'granted' ? `已启用，本地有 ${analyticsEventCount} 条事件` : '关闭，未记录使用事件'}</p>
       <div className="privacy-actions"><button className="primary" onClick={() => chooseAnalyticsConsent('granted')}>{analyticsConsent === 'granted' ? '保持启用' : '同意并启用'}</button><button onClick={() => chooseAnalyticsConsent('denied')}>关闭并清除本地数据</button></div>
     </dialog>
-    <SupportContact key={customer?.id ?? 'guest'} ref={supportContactRef} preview={VISUAL_PREVIEW}
+    <SupportContact key={customer?.id ?? 'guest'} ref={supportContactRef} preview={VISUAL_PREVIEW} customer={customer}
+      onLogin={() => { setShowGuestOrders(false); navigate('account') }}
       order={page === 'order' && order && orderRef ? { id: order.public_id, token: orderRef.token } : null}
       onOrders={() => { setShowGuestOrders(false); navigate('account') }}
       onSubmitted={() => { const version = privateVersion.current; if (order && orderRef) request<{ items: SupportSummary[] }>('/support-requests?order_ref=' + encodeURIComponent(order.public_id), { headers: orderRef.token ? { Authorization: 'Bearer ' + orderRef.token } : {} }).then(result => { if (version === privateVersion.current) setSupportRequests(result.items) }).catch(() => {}) }} />
