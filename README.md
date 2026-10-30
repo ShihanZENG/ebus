@@ -1,55 +1,51 @@
-# 跨境电商系统开发
+# EBUS · 跨境电商 ERP 与 LIM
 
-采用按批次确定目标、由 AI 连续实施并验证的开发方式。ERP 基础资料、OMS 订单、WMS 仓储和 SCM 采购补货主链路已实现，前端采用 Vite + React + Ant Design。近期增补了独立采购计划、采购变更、供应商报价历史、FBA 发货计划、Listing 映射和客服工单，并提供相应页面与接口。`backend/scripts/seed_demo.py` 可灌入演示数据。部署说明、备份恢复演练与操作手册已完成。
+本仓库包含跨境电商 ERP 后端与管理前端、独立 OMS、Storefront，以及 LIM 智能经营能力。后端使用 FastAPI、SQLAlchemy 和 Alembic；管理前端使用 React、TypeScript 和 Ant Design。
 
-## 本地登录账号与访问地址
+## 当前能力与边界
 
-| 系统 | 前端登录地址 | 账号 | 密码 | 后端接口文档 |
-|---|---|---|---|---|
-| 跨境主系统（ERP / OMS / WMS / SCM） | http://127.0.0.1:15173/login | 本地配置 | 本地配置 | http://127.0.0.1:18080/docs |
-| 独立 OMS 订单管理系统 | http://127.0.0.1:3001/login | 本地配置 | 本地配置 | http://127.0.0.1:18090/docs |
+- ERP 覆盖商品、订单、库存、采购、客服工单等业务。独立 OMS 和 Storefront 有各自的前后端与文档。
+- `/lim-workbench` 展示授权业务数据上的 LIM 运行、证据图谱和追踪。Neo4j 检索、模型调用和外部追踪依赖本地配置；缺少配置时界面会报告连接状态。
+- `/api/v1/lim/v2/*` 是五大能力**沙盘接口**：图谱含示例数据，执行接口只模拟状态机，不会修改生产订单、库存或付款。代码见 [沙盘路由](./backend/app/lim_enterprise_routes.py)。
+- 客服意图识别位于 [intent.py](./backend/app/intent.py)。工单识别会记录事件与审计；识别结果是路由建议，不会自动退款或审批。
+- Storefront 持有库存预占的订单，在申请发货和确认出库时会检查已核验的真实付款，详见 [WMS 支付门禁](./backend/app/wms.py)。
 
-主系统账号来自本地 `backend/.env`；独立 OMS 账号使用本地初始化配置。请勿将真实账号、密码或密钥提交到版本库。
+## 本地启动（PowerShell）
 
-主系统登录后从企业工作区入口进入已授权的 ERP 或 AI 工作区。点击“独立 OMS”会在新窗口打开 `http://127.0.0.1:3001/login`，使用 OMS 账号独立登录；入口不会传递 ERP 凭据，也不自动授予 OMS 权限。
+先安装 Python、Node.js 和 Docker。后端环境变量只从 `backend/.env` 读取；请从示例文件复制并填写本地密码，不要提交真实凭据。
 
-独立 OMS 前端默认端口为 `3001`，端口占用时会自动顺延（例如 http://127.0.0.1:3002/login），请以启动日志为准。主系统和独立 OMS 分别启动，独立 OMS 的启动步骤见 [OMS README](./oms/README.md)。
-
-## 文档入口
-
-- [统一系统与八模块规划](./docs/统一系统与八模块规划.md)：已确认的系统边界、模块归属与近期开发顺序。
-
-- [利润、广告与客服的实际生成能力](./docs/经营与客服生成能力.md)：运行入口、输入契约、审核边界及当前限制。
-
-- [采购 Agent 当前上线步骤与待补资料](./docs/采购Agent开发/08_上线能力与补充数据.md)：模型接入、ERP加权销量、逐日供需、采购/发货草稿、审批复核。
-
-- [开发执行计划](./开发执行计划.md)：范围、模块职责、实施批次和验收条件。
-- [一期完成目标与验收标准](./docs/一期完成目标与验收标准.md)：一期完整目标、阶段验收和明确不做的范围。
-- [第一批执行说明](./第一批执行说明.md)：AI 开始开发时可以直接遵循的具体任务。
-- [前端启动与结构](./frontend/README.md)
-- [ERP 功能章节与逐篇写作提示词](./docs/功能章节/README.md)
-- [OMS 订单管理功能文档](./docs/oms/README.md)
-- [AI 总助手与多 Agent 目标架构](./docs/AI总助手与多Agent目标架构.md)
-- [LIM 能力盘点与首批边界](./docs/lim/g0-capability-inventory.md)：按 PRD LIM-FR-001–024 对照当前实现、证据和后续阶段。
-- [后端启动与接口使用](./backend/README.md)
-- [ERP 后端设计](./docs/ERP后端设计.md)
-- [后端交付说明](./docs/ERP后端交付说明.md)
-- [部署说明](./docs/部署说明.md)
-- [备份恢复说明](./docs/备份恢复说明.md)
-- [操作手册](./docs/操作手册.md)
-- [本地接口文档](http://127.0.0.1:18080/docs)
-
-## 目录结构
-
-```text
-跨境电商系统开发/
-├── README.md
-├── 开发执行计划.md
-├── 第一批执行说明.md
-├── backend/              ERP/OMS/WMS/SCM 后端代码、数据库迁移和验证
-├── frontend/             React + Ant Design 前端页面与接口调用
-├── docs/                 后端设计、接口契约和交付说明
-└── 归档/                 旧路线和台账，仅作历史参考
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+# 编辑 .env：保持 DATABASE_URL 与 POSTGRES_* 的密码一致
+docker compose -p crossborder-erp up -d db redis
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m app.bootstrap --demo
+.\start.ps1
 ```
 
-后端采用 FastAPI、SQLAlchemy、Alembic 和本机 Docker PostgreSQL 15。四条业务主链路已打通：销售发货（建单→审核→预留→出库→发货）和采购补货（建议→采购→分批收货→入库）。前端已接通全部模块页面并完成生产构建验证，看板数据为真实聚合。第五批交付件已齐备：部署说明、备份恢复演练（27 张表行数比对一致）、操作手册。剩余为一期范围外的外部系统对接（平台拉单、物流、支付汇兑）。
+在另一个终端启动管理前端：
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+管理前端默认在 `http://127.0.0.1:15173`，后端接口文档在 `http://127.0.0.1:18080/docs`。Neo4j、OpenTelemetry 和 Langfuse 的可选配置见 [后端 README](./backend/README.md)。独立 OMS 的启动步骤见 [OMS README](./oms/README.md)；Storefront 见 [Storefront README](./storefront/README.md)。
+
+## 验证
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest tests/test_intent_context.py tests/test_storefront_bridge.py tests/test_external_payment_idempotency.py tests/test_lim_five_pillars.py tests/test_erp.py::test_migration_seed_persistence -q
+```
+
+```powershell
+cd frontend
+npm run build
+```
+
+更多业务边界和需求对照见 [LIM 能力盘点](./docs/lim/g0-capability-inventory.md)与[开发执行计划](./开发执行计划.md)。

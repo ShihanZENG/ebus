@@ -38,7 +38,8 @@ class LiveMemory(m.Record, m.Base):
 
 class LiveEvaluation(m.Record, m.Base):
     __tablename__ = 'lim_live_evaluations'
-    run_id: Mapped[str] = mapped_column(ForeignKey('lim_live_runs.id'), unique=True, index=True)
+    __table_args__ = (UniqueConstraint('run_id', name='uq_lim_live_evaluations_run_id'),)
+    run_id: Mapped[str] = mapped_column(ForeignKey('lim_live_runs.id'), index=True)
     version: Mapped[int] = mapped_column(Integer)
     metrics: Mapped[dict] = mapped_column(JSON)
     usage: Mapped[dict] = mapped_column(JSON)

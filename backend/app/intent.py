@@ -11,9 +11,10 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 
 from . import models as m
-from .customer_tickets import CustomerTicket, add_event, ticket_or_404
+from .customer_tickets import CustomerTicketEvent, add_event, ticket_or_404
 from .security import record_audit, require, session_db
 from .supply_agent_llm import completion
 
@@ -165,9 +166,13 @@ def llm_classify(message: str, market=None, actor_id=None):
         return None
 
 
-def classify(message: str, market=None, actor_id=None):
+def classify(message: str, market=None, actor_id=None, previous=None):
     """意图识别主入口：LLM 优先，低置信 / 失败降级到关键词规则；并补齐槽位完整性判断。"""
-    result = llm_classify(message, market, actor_id)
+    try:
+        result = llm_classify(message, market, actor_id)
+    except Exception:
+        # Model providers can fail with transport or response errors as well as RuntimeError.
+        result = None
     if result is None or result['confidence'] < 0.4:
         rule_intent, rule_conf = rule_based_classify(message)
         if result is None:
@@ -181,6 +186,22 @@ def classify(message: str, market=None, actor_id=None):
     # 正则兜底补抽订单号 / 运单号（LLM 漏抽时补充，不覆盖已抽到的）
     for k, v in _extract_slots(message).items():
         result['slots'].setdefault(k, v)
+    if isinstance(previous, dict) and previous.get('intent') in INTENTS:
+        previous_intent = previous['intent']
+        previous_slots = previous.get('slots')
+        if isinstance(previous_slots, dict):
+            safe_slots = {k: str(v)[:200] for k, v in previous_slots.items()
+                          if k in SLOT_KEYS and isinstance(v, str) and v.strip()}
+            new_order_no = result['slots'].get('order_no')
+            if new_order_no and safe_slots.get('order_no') not in (None, new_order_no):
+                # A different order must not inherit the prior order's reason or tracking details.
+                safe_slots = {}
+            if result['intent'] == previous_intent:
+                result['slots'] = {**safe_slots, **result['slots']}
+            elif result['intent'] == INTENT_OTHER and new_order_no:
+                result['intent'] = previous_intent
+                result['slots'] = {**safe_slots, **result['slots']}
+                result['source'] = 'ticket_context'
     intent = result['intent']
     required = REQUIRED_SLOTS.get(intent, [])
     missing = [s for s in required if not result['slots'].get(s)]
@@ -218,15 +239,26 @@ def recognize(payload: RecognizeInput,
 
 
 @intent_router.post('/tickets/{ticket_id}/recognize')
-def recognize_ticket(ticket_id: str, db=Depends(session_db),
-                     user=Depends(require('customer_tickets:read'))):
+def recognize_ticket(ticket_id: str, payload: RecognizeInput | None = None,
+                     db=Depends(session_db),
+                     user=Depends(require('customer_tickets:write'))):
     """基于工单识别意图与槽位，并写回一条工单事件 + 审计，便于追溯与后续编排。"""
     ticket = ticket_or_404(db, user, ticket_id)
-    message = f"{ticket.subject}\n{ticket.description}"
-    result = classify(message, None, user.id)
+    message = payload.message if payload is not None else f"{ticket.subject}\n{ticket.description}"
+    last_event = db.scalar(select(CustomerTicketEvent).where(
+        CustomerTicketEvent.ticket_id == ticket.id,
+        CustomerTicketEvent.event_type == 'intent_recognized',
+    ).order_by(CustomerTicketEvent.created_at.desc(), CustomerTicketEvent.id.desc()).limit(1))
+    try:
+        previous = json.loads(last_event.content) if last_event is not None else None
+    except (TypeError, ValueError):
+        previous = None
+    result = classify(message, payload.market if payload is not None else None,
+                      user.id, previous=previous)
     event = add_event(db, user, ticket, 'intent_recognized',
                       content=json.dumps({'intent': result['intent'],
                                          'confidence': result['confidence'],
+                                         'slots': result['slots'],
                                          'suggested_category': result['suggested_category'],
                                          'routing': result['routing'],
                                          'missing_slots': result['missing_slots']},
