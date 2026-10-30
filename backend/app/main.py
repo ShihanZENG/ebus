@@ -29,6 +29,7 @@ from .purchase_agent import router as purchase_agent_router
 from .supply_agent import router as supply_agent_router
 from .business_analysis import router as business_analysis_router
 from .agent_generation import router as agent_generation_router, customer_agent_router
+from .intent import intent_router
 from .generation_reviews import router as generation_reviews_router
 from .profit_reconciliation import router as profit_reconciliation_router
 from .channels import router as channels_router
@@ -270,6 +271,7 @@ def create_app(engine=None, *, storefront_enabled=False):
     app.include_router(business_analysis_router)
     app.include_router(agent_generation_router)
     app.include_router(customer_agent_router)
+    app.include_router(intent_router)
     app.include_router(generation_reviews_router)
     app.include_router(profit_reconciliation_router)
     app.include_router(channels_router)
