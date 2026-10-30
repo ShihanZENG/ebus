@@ -8,7 +8,7 @@ import { pricePatch } from './storefrontPublication.mjs'
 interface Variant { id: string; sku_id: string; color: string; size: string; price: string; available_qty: number }
 interface Product { id: string; title: string; slug: string; status: 'draft' | 'published'; version: number; gallery: string[]; material: string; care_instructions: string; size_guide: { size: string; chest_cm?: string; waist_cm?: string; hip_cm?: string; length_cm?: string; sleeve_cm?: string }[]; variants: Variant[] }
 interface Site { brand_name: string; company_name: string; company_address: string; contact_email: string; shop_name: string; warehouse_name: string }
-interface SupportRequest { id: string; ticket_ref: string; order_ref: string | null; contact_email?: string | null; issue: string; message: string; status: 'open' | 'in_progress' | 'resolved' | 'closed'; created_at: string }
+interface SupportRequest { id: string; ticket_ref: string; order_ref: string | null; contact_email?: string | null; issue: string; message: string; intent: string; reply: string; status: 'open' | 'in_progress' | 'resolved' | 'closed'; created_at: string }
 interface AfterSalesRow { id: string; public_ref: string; order_ref: string; kind: 'return' | 'refund'; items: { title: string; color: string; size: string; quantity: number; line_total: string }[]; reason: string; message: string; status: 'submitted' | 'processing' | 'completed' | 'rejected'; note: string; created_at: string | null }
 interface SourceProduct { id: string; code: string; name: string; description: string }
 interface SourceSku { id: string; code: string; name: string; attributes: Record<string, string> }
@@ -21,6 +21,9 @@ export default function StorefrontPage() {
   const [site, setSite] = useState<Site | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([])
+  const [replyTarget, setReplyTarget] = useState<SupportRequest | null>(null)
+  const [replyValue, setReplyValue] = useState('')
+  const [replyStatus, setReplyStatus] = useState<SupportRequest['status']>('in_progress')
   const [afterSales, setAfterSales] = useState<AfterSalesRow[]>([])
   const [noteTarget, setNoteTarget] = useState<AfterSalesRow | null>(null)
   const [noteValue, setNoteValue] = useState('')
@@ -114,12 +117,30 @@ export default function StorefrontPage() {
   }
 
   async function updateSupportStatus(item: SupportRequest, status: SupportRequest['status']) {
+    if ((status === 'resolved' || status === 'closed') && !item.reply) {
+      setReplyTarget(item); setReplyValue(''); setReplyStatus(status)
+      return
+    }
     setSaving(true)
     try {
       await request(`/storefront/support-requests/${item.id}`, { method: 'PATCH', body: { status } })
       message.success(`请求 ${item.ticket_ref} 已更新`)
       await load()
     } catch (e) { message.error(e instanceof Error ? e.message : '更新客服请求失败') }
+    finally { setSaving(false) }
+  }
+
+  async function saveSupportReply() {
+    if (!replyTarget || !replyValue.trim()) return
+    setSaving(true)
+    try {
+      await request(`/storefront/support-requests/${replyTarget.id}`, {
+        method: 'PATCH', body: { status: replyStatus, reply: replyValue.trim() },
+      })
+      message.success('回复已保存，顾客可在咨询记录中查看')
+      setReplyTarget(null)
+      await load()
+    } catch (e) { message.error(e instanceof Error ? e.message : '保存回复失败') }
     finally { setSaving(false) }
   }
 
@@ -260,12 +281,19 @@ export default function StorefrontPage() {
         <Table.Column title="商城订单号" dataIndex="order_ref" render={(value: string | null) => value || '售前咨询'} />
         <Table.Column title="联系邮箱" dataIndex="contact_email" />
         <Table.Column title="问题类型" dataIndex="issue" render={(value: string) => ({ product: '商品', delivery: '订单/配送', return: '退换/售后', other: '其他' }[value] || value)} />
+        <Table.Column title="识别建议" dataIndex="intent" render={(value: string) => <Tag>{({ product_inquiry: '商品咨询', logistics: '物流查询', return: '退货退款', refund: '退款', exchange: '换货', cancel_order: '取消订单', complaint: '投诉', invoice: '发票', other: '其他/人工' } as Record<string, string>)[value] || value}</Tag>} />
         <Table.Column title="说明" dataIndex="message" width={300} render={(value: string) => <Typography.Text style={{ whiteSpace: 'normal' }}>{value}</Typography.Text>} />
         <Table.Column title="提交时间" dataIndex="created_at" render={(value: string) => value ? new Date(value).toLocaleString('zh-CN') : '—'} />
         <Table.Column title="处理状态" dataIndex="status" render={(_: unknown, row: SupportRequest) => <Select<SupportRequest['status']> aria-label={`${row.ticket_ref}处理状态`} disabled={!canWrite || saving} value={row.status} style={{ width: 140 }} onChange={status => void updateSupportStatus(row, status)} options={[{ value: 'open', label: '待处理' }, { value: 'in_progress', label: '处理中' }, { value: 'resolved', label: '已解决' }, { value: 'closed', label: '已关闭' }]} />} />
+        <Table.Column title="客服回复" dataIndex="reply" width={250} render={(_: unknown, row: SupportRequest) => <Space><Typography.Text style={{ whiteSpace: 'normal' }}>{row.reply || '未回复'}</Typography.Text>{canWrite && <Button disabled={saving} onClick={() => { setReplyTarget(row); setReplyValue(row.reply || ''); setReplyStatus(row.status === 'open' ? 'in_progress' : row.status) }}>回复</Button>}</Space>} />
       </Table>
       {!supportRequests.length && <Typography.Text type="secondary">暂无客服请求。</Typography.Text>}
     </Card>
+    <Modal title={replyTarget ? `回复 ${replyTarget.ticket_ref}` : '回复咨询'} open={!!replyTarget} onCancel={() => setReplyTarget(null)} onOk={() => void saveSupportReply()} okText="保存回复" okButtonProps={{ disabled: !replyValue.trim(), loading: saving }}>
+      <Typography.Paragraph>顾客留言：{replyTarget?.message}</Typography.Paragraph>
+      <Typography.Paragraph>保存后状态：{({ open: '待处理', in_progress: '处理中', resolved: '已解决', closed: '已关闭' } as Record<string, string>)[replyStatus]}</Typography.Paragraph>
+      <Input.TextArea aria-label="客服回复内容" value={replyValue} onChange={e => setReplyValue(e.target.value)} maxLength={2000} showCount rows={5} placeholder="写给顾客的处理说明或需要补充的信息" />
+    </Modal>
     <Card title="售后申请（退货 / 退款）" extra={<Tag>{afterSales.length} 条申请</Tag>}>
       <Typography.Paragraph type="secondary">顾客从订单详情提交售后申请。状态更新仅作演示登记，不产生真实退货物流或退款；处理备注会回显给顾客。</Typography.Paragraph>
       <Table<AfterSalesRow> rowKey="id" dataSource={afterSales} pagination={{ pageSize: 10 }} size="small" scroll={{ x: 1000 }}>

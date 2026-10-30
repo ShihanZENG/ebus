@@ -181,12 +181,14 @@ def test_verified_customer_can_create_and_staff_can_process_support_request(stor
     assert staff_list.status_code == 200, staff_list.text
     ticket = staff_list.json()['items'][0]
     assert ticket['message'] == payload['message']
+    assert ticket['intent'] == 'logistics'
     assert 'address' not in ticket and 'customer_contact' not in ticket
     updated = client.patch(f"/api/v1/storefront/support-requests/{ticket['id']}", headers=auth,
-                           json={'status': 'resolved'})
+                           json={'status': 'resolved', 'reply': '演示订单状态已确认。'})
     assert updated.status_code == 200, updated.text
     assert updated.json()['status'] == 'resolved'
     assert client.get(lookup, headers=customer_auth).json()['items'][0]['status'] == 'resolved'
+    assert client.get(lookup, headers=customer_auth).json()['items'][0]['reply'] == '演示订单状态已确认。'
 
 
 def test_support_attachment_is_private_authorized_and_expires(storefront, tmp_path, monkeypatch):

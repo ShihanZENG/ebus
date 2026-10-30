@@ -210,6 +210,7 @@ class SupportRequestInput(Input):
 
 class SupportStatusInput(Input):
     status: Literal['open', 'in_progress', 'resolved', 'closed']
+    reply: str | None = Field(default=None, min_length=1, max_length=2000)
 
 
 class PresalesEnquiryInput(Input):

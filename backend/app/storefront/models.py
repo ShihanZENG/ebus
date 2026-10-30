@@ -103,6 +103,9 @@ class SupportRequest(Record, Base):
     issue: Mapped[str] = mapped_column(String(32))
     message: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default='open', index=True)
+    intent: Mapped[str] = mapped_column(String(32), default='other', server_default='other')
+    reply: Mapped[str] = mapped_column(Text, default='', server_default='')
+    receipt_hash: Mapped[str] = mapped_column(String(64), default='', server_default='')
 
 
 class SupportAttachment(Record, Base):

@@ -20,6 +20,34 @@ def test_presales_message_reaches_private_inbox_without_order(storefront):
                         json={'status': 'in_progress'}).status_code == 200
 
 
+def test_presales_reply_requires_private_receipt(storefront):
+    client, auth, *_ = storefront
+    created = client.post(PUBLIC + '/support-requests/enquiries', json={
+        'contact_email': 'visitor@example.invalid', 'message': '请问针织衫尺码？'})
+    assert created.status_code == 201
+    ref = created.json()['ticket_ref']
+    receipt = created.json()['receipt_token']
+    assert len(receipt) >= 32
+    path = PUBLIC + '/support-requests/enquiries/' + ref
+    assert client.get(path).status_code in (401, 403)
+    assert client.get(path, headers={'Authorization': 'Bearer wrong'}).status_code == 404
+    row = client.get(ADMIN + '/support-requests', headers=auth).json()['items'][0]
+    assert row['intent'] == 'product_inquiry'
+    assert 'receipt_token' not in row and 'receipt_hash' not in row
+    assert client.patch(ADMIN + '/support-requests/' + row['id'], headers=auth,
+                        json={'status': 'resolved'}).status_code == 422
+    updated = client.patch(ADMIN + '/support-requests/' + row['id'], headers=auth,
+                           json={'status': 'resolved', 'reply': '该商品尺码表已在详情页更新。'})
+    assert updated.status_code == 200, updated.text
+    viewed = client.get(path, headers={'Authorization': 'Bearer ' + receipt})
+    assert viewed.status_code == 200
+    assert viewed.json()['status'] == 'resolved'
+    assert viewed.json()['reply'] == '该商品尺码表已在详情页更新。'
+    assert 'contact_email' not in viewed.json()
+    assert client.patch(ADMIN + '/support-requests/' + row['id'], headers=auth,
+                        json={'status': 'resolved', 'reply': '   '}).status_code == 422
+
+
 def test_presales_validation_and_order_boundary(storefront):
     client, auth, *_ = storefront
     path = PUBLIC + '/support-requests/enquiries'

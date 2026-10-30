@@ -17,6 +17,7 @@ from sqlalchemy import select, func, or_
 from .. import models as m
 from ..security import session_db, require, record_audit, bearer, token_hash
 from ..config import ROOT
+from ..intent import INTENT_OTHER, INTENT_PRODUCT, INTENT_LOGISTICS, INTENT_RETURN, rule_based_classify
 from . import models as sm, schemas as s, service as svc
 from . import accounts, campaigns
 
@@ -303,13 +304,31 @@ def create_presales_enquiry(payload: s.PresalesEnquiryInput, db=Depends(session_
         if product is None:
             raise HTTPException(404, '商品不存在或已下架，请重新选择商品')
         message = f'商品咨询：{product.title}（{product.slug}）\n{message}'
+    receipt = secrets.token_urlsafe(32)
     enquiry = sm.SupportRequest(site_id=site.id, order_id=None,
                                contact_email=payload.contact_email,
                                public_ref='ZJS-' + secrets.token_hex(8).upper(),
-                               issue='product' if payload.product_slug else 'other', message=message)
+                               issue='product' if payload.product_slug else 'other', message=message,
+                               intent=support_intent(message, 'product' if payload.product_slug else 'other'),
+                               receipt_hash=token_hash(receipt))
     db.add(enquiry)
     db.commit()
-    return {'ticket_ref': enquiry.public_ref, 'status': enquiry.status, 'demo': True}
+    return {'ticket_ref': enquiry.public_ref, 'status': enquiry.status,
+            'receipt_token': receipt, 'demo': True}
+
+
+@router.get('/support-requests/enquiries/{ticket_ref}')
+def get_presales_enquiry(ticket_ref: str, credentials=Depends(bearer), db=Depends(session_db)):
+    if not credentials:
+        raise HTTPException(401, '缺少咨询查询凭据')
+    site = svc.site(db)
+    row = db.scalar(select(sm.SupportRequest).where(sm.SupportRequest.site_id == site.id,
+                    sm.SupportRequest.public_ref == ticket_ref,
+                    sm.SupportRequest.order_id.is_(None)))
+    if not row or not row.receipt_hash or not hmac.compare_digest(row.receipt_hash, token_hash(credentials.credentials)):
+        raise HTTPException(404, '咨询记录不存在')
+    return {'ticket_ref': row.public_ref, 'status': row.status, 'reply': row.reply,
+            'updated_at': row.updated_at.isoformat() + 'Z' if row.updated_at else None}
 
 
 @router.post('/support-requests', status_code=201)
@@ -331,7 +350,8 @@ async def create_support_request(request: Request, credentials=Depends(bearer), 
         raise HTTPException(422, '客服请求内容无效') from exc
     request = sm.SupportRequest(site_id=site.id, order_id=meta.order_id,
                                 public_ref='ZJS-' + secrets.token_hex(8).upper(),
-                                issue=payload.issue, message=payload.message)
+                                issue=payload.issue, message=payload.message,
+                                intent=support_intent(payload.message, payload.issue))
     db.add(request)
     db.flush()
     if attachment_file is not None and getattr(attachment_file, 'filename', None):
@@ -418,6 +438,7 @@ def customer_support_requests(request: Request, order_ref: str = Query(..., min_
                                                      sm.SupportRequest.order_id == meta.order_id)
                       .order_by(sm.SupportRequest.created_at.desc(), sm.SupportRequest.id)).all()
     return {'items': [{'ticket_ref': row.public_ref, 'issue': row.issue, 'status': row.status,
+                       'reply': row.reply,
                        'created_at': row.created_at.isoformat() + 'Z' if row.created_at else None,
                        'updated_at': row.updated_at.isoformat() + 'Z' if row.updated_at else None}
                       for row in rows]}
@@ -479,10 +500,20 @@ def customer_after_sales(request: Request, order_ref: str = Query(..., min_lengt
     return {'items': [svc.after_sales_dto(db, row) for row in rows]}
 
 
+def support_intent(message: str, issue: str) -> str:
+    # Public requests use local rules only; customer text never triggers an external model call.
+    intent, _ = rule_based_classify(message)
+    if intent != INTENT_OTHER:
+        return intent
+    return {'product': INTENT_PRODUCT, 'delivery': INTENT_LOGISTICS,
+            'return': INTENT_RETURN}.get(issue, INTENT_OTHER)
+
+
 def support_dto(request):
     return {'id': request.id, 'ticket_ref': request.public_ref, 'order_ref': None,
             'contact_email': request.contact_email,
             'issue': request.issue, 'message': request.message, 'status': request.status,
+            'intent': request.intent, 'reply': request.reply,
             'created_at': request.created_at.isoformat() + 'Z' if request.created_at else None,
             'updated_at': request.updated_at.isoformat() + 'Z' if request.updated_at else None}
 
@@ -515,12 +546,17 @@ def update_support_request(request_id: str, payload: s.SupportStatusInput,
                                                         sm.SupportRequest.site_id == site.id).with_for_update())
     if not request:
         raise HTTPException(404, '客服请求不存在')
-    before = {'status': request.status}
+    if payload.status in ('resolved', 'closed') and not (payload.reply or request.reply).strip():
+        raise HTTPException(422, '完成客服请求前请填写给顾客的回复')
+    before = {'status': request.status, 'reply': request.reply}
     request.status = payload.status
+    if payload.reply is not None:
+        request.reply = payload.reply
     db.flush()
     result = support_dto(request)
     record_audit(db, user, 'storefront_support', request.id, 'update_status',
-                 before=before, after={'status': request.status, 'ticket_ref': request.public_ref})
+                 before=before, after={'status': request.status, 'reply': request.reply,
+                                       'ticket_ref': request.public_ref})
     db.commit()
     return result
 

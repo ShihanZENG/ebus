@@ -95,7 +95,7 @@ _KEYWORD_RULES = [
     (INTENT_LOGISTICS, ('物流', '快递', '到哪', '运单', 'tracking', '发货了吗', '什么时候到')),
     (INTENT_COMPLAINT, ('投诉', '差评', '投诉你', 'complain')),
     (INTENT_INVOICE, ('发票', '凭证', 'invoice')),
-    (INTENT_PRODUCT, ('怎么用', '什么材质', '有货吗', '尺寸')),
+    (INTENT_PRODUCT, ('怎么用', '什么材质', '有货吗', '尺寸', '尺码', 'size guide')),
 ]
 
 
