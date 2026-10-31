@@ -2,8 +2,14 @@
 .support-launcher span { display: grid; text-align: left; font-size: 14px; line-height: 1.4; }
 .support-launcher small { font-size: 10px; opacity: .8; }
 .support-dialog { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 30px; border: 1px solid #dfd7ca; border-radius: 12px; background: #fffdf8; color: #23362d; overflow-y: auto; }
+.support-dialog-ai { height: min(650px, calc(100dvh - 24px)); overflow: hidden; }
+.support-dialog-ai[open] { display: flex; flex-direction: column; }
+.support-ai-panel { display: flex; flex: 1; min-height: 0; }
+.support-ai-panel[hidden] { display: none; }
 .support-dialog::backdrop { background: #14271f80; }
 .support-dialog h2 { margin: 8px 0 12px; font-size: 25px; }
+.support-dialog-ai h2 { margin-bottom: 4px; }
+.support-dialog-ai > .support-hint { margin-bottom: 5px; }
 .support-dialog .support-close { position: absolute; right: 12px; top: 8px; width: 36px; height: 36px; padding: 0; background: transparent; border: 0; font-size: 27px; color: #23362d; cursor: pointer; }
 .support-dialog fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .support-dialog label { display: grid; gap: 7px; margin-top: 16px; font-size: 13px; }
