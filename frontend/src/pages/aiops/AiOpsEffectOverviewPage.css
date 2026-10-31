@@ -5,7 +5,7 @@
 .effect-overview-metric { display: grid; grid-template-columns: minmax(100px, 1.4fr) minmax(80px, 1fr) minmax(70px, 1fr) minmax(80px, 1fr); gap: 8px; align-items: center; padding: 10px 12px; }
 .effect-overview-metric + .effect-overview-metric { border-top: 1px solid #f0f0f0; }
 .effect-overview-metric-head { background: #fafafa; color: #8c8c8c; font-size: 12px; }
-.effect-overview-name { font-weight: 500; }
+.effect-overview-name { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
 .effect-overview-value { min-width: 0; overflow-wrap: anywhere; }
 .effect-overview-value .ant-tag { margin-right: 0; white-space: normal; }
 @media (max-width: 600px) {
