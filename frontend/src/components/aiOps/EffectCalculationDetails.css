@@ -1,0 +1,7 @@
+.effect-calculations { display: grid; gap: 12px; }
+.effect-calculation { padding: 12px 14px; border: 1px solid #f0f0f0; border-radius: 8px; background: #fafafa; }
+.effect-calculation-title { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.effect-calculation-title .ant-tag { margin: 0; }
+.effect-calculation p { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; margin: 5px 0; line-height: 1.6; overflow-wrap: anywhere; }
+.effect-calculation p span { color: #8c8c8c; }
+@media (max-width: 600px) { .effect-calculation p { grid-template-columns: 1fr; gap: 0; } }

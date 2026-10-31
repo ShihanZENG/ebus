@@ -12,6 +12,7 @@
  *    页面会用 DemoNote 横幅明确隔离，绝不伪装成真实接口数据。
  */
 import { request } from './client'
+import { calculateEffectMetric, summarizeEffectRating } from './effectCalculations.mjs'
 
 // ---------------------------------------------------------------------------
 // 通用类型
@@ -214,6 +215,9 @@ export interface EffectMetric {
   actual: string
   deviation: string
   rating: 'good' | 'warn' | 'bad'
+  formula: string
+  calculation: string
+  decision: string
 }
 export interface EffectRecord {
   id: string
@@ -226,26 +230,29 @@ export interface EffectRecord {
   source: 'demo'
 }
 
+const coffeeMetrics: EffectMetric[] = [
+  calculateEffectMetric('margin', { revenue: 100000, profit: 5400, target: 5 }),
+  calculateEffectMetric('profit', { baseline: -80, current: 5400, target: 5200 }),
+  calculateEffectMetric('conversion', { baseline: 5, current: 4.84, maxDrop: 5 }),
+]
+const warehouseMetrics: EffectMetric[] = [
+  calculateEffectMetric('outboundHours', { totalHours: 5800, orderCount: 200, target: 24 }),
+  calculateEffectMetric('affectedOrders', { affected: 148, target: 100 }),
+]
+
 const demoEffects: EffectRecord[] = [
   {
     id: 'EFF-2026-0501', strategyId: 'STR-2026-0385', title: '欧洲站咖啡毛利修复复盘',
-    rating: 'good', reviewedAt: '2026-10-23 08:00',
-    metrics: [
-      { metric: '加权毛利', plan: '≥ 5%', actual: '5.4%', deviation: '+0.4pp', rating: 'good' },
-      { metric: '利润贡献', plan: '+$5,200', actual: '+$5,480', deviation: '+$280', rating: 'good' },
-      { metric: '转化率', plan: '降幅 ≤ 5%', actual: '-3.2%', deviation: '优于预期', rating: 'good' },
-    ],
-    comment: '提价与暂停低效词组合生效，转化损失可控，建议固化为止损基线。',
+    rating: summarizeEffectRating(coffeeMetrics), reviewedAt: '2026-10-23 08:00',
+    metrics: coffeeMetrics,
+    comment: '三项演示指标均达到计划。该数值对比不能单独证明策略造成了改善；正式复盘还需真实数据来源和对照期。',
     source: 'demo',
   },
   {
     id: 'EFF-2026-0498', strategyId: 'STR-2026-0372', title: '美东仓出库时效优化复盘',
-    rating: 'warn', reviewedAt: '2026-10-22 09:00',
-    metrics: [
-      { metric: '平均出库时长', plan: '≤ 24h', actual: '29h', deviation: '+5h', rating: 'warn' },
-      { metric: '受影响订单', plan: '≤ 100', actual: '148', deviation: '+48', rating: 'warn' },
-    ],
-    comment: '波次优化见效但未达标，需补充峰值产能或延长作业窗口。',
+    rating: summarizeEffectRating(warehouseMetrics), reviewedAt: '2026-10-22 09:00',
+    metrics: warehouseMetrics,
+    comment: '两项演示指标均超过目标上限，因此判定未达标。缺少优化前基线，尚不能判断波次优化是否见效。',
     source: 'demo',
   },
 ]

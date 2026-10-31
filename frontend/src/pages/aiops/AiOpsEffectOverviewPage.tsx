@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Col, Row, Space, Tag, Typography } from 'antd'
+import { Button, Card, Col, Collapse, Row, Space, Tag, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { fetchEffects, type EffectRecord } from '../../api/aiOps'
 import DemoNote from '../../components/aiOps/DemoNote'
+import EffectCalculationDetails from '../../components/aiOps/EffectCalculationDetails'
 import './AiOpsEffectOverviewPage.css'
 
 const ratingMeta: Record<EffectRecord['rating'], { color: string; label: string }> = { good: { color: 'green', label: '达标' }, warn: { color: 'orange', label: '基本达标' }, bad: { color: 'red', label: '未达标' } }
@@ -46,6 +47,10 @@ export default function AiOpsEffectOverviewPage() {
                   </div>
                 ))}
               </div>
+              <Collapse ghost size="small" style={{ marginTop: 8 }} items={[{
+                key: 'calculation', label: '查看计算公式与判断依据',
+                children: <EffectCalculationDetails metrics={r.metrics} />,
+              }]} />
             </Card>
           </Col>
         ))}

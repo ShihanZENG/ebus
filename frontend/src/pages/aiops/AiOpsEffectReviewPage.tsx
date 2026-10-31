@@ -5,6 +5,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { fetchEffect, type EffectMetric, type EffectRecord } from '../../api/aiOps'
 import DemoNote from '../../components/aiOps/DemoNote'
+import EffectCalculationDetails from '../../components/aiOps/EffectCalculationDetails'
 
 const ratingMeta: Record<EffectRecord['rating'], { color: string; label: string }> = { good: { color: 'green', label: '达标' }, warn: { color: 'orange', label: '基本达标' }, bad: { color: 'red', label: '未达标' } }
 
@@ -25,7 +26,7 @@ export default function AiOpsEffectReviewPage() {
     { title: '指标', dataIndex: 'metric' },
     { title: '计划（仿真）', dataIndex: 'plan' },
     { title: '实际', dataIndex: 'actual', render: (v: string) => <Typography.Text strong>{v}</Typography.Text> },
-    { title: '偏差', dataIndex: 'deviation', render: (v: string) => <Tag color={rec.rating === 'good' ? 'green' : rec.rating === 'warn' ? 'orange' : 'red'}>{v}</Tag> },
+    { title: '偏差', dataIndex: 'deviation', render: (v: string, metric) => <Tag color={metric.rating === 'good' ? 'green' : metric.rating === 'warn' ? 'orange' : 'red'}>{v}</Tag> },
   ]
 
   return (
@@ -51,6 +52,10 @@ export default function AiOpsEffectReviewPage() {
 
       <Card title="仿真结果与实际指标对比">
         <Table rowKey="metric" pagination={false} columns={columns} dataSource={rec.metrics} />
+      </Card>
+
+      <Card title="计算公式与判断依据">
+        <EffectCalculationDetails metrics={rec.metrics} />
       </Card>
 
       <Card title="评价">
