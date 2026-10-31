@@ -3,6 +3,7 @@ import { Alert, Button, Card, DatePicker, Form, Input, List, Modal, Popconfirm, 
 import type { Dayjs } from 'dayjs'
 import { request } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
+import AssistantTaskResult from './AssistantTaskResult'
 
 type Option = { id: string; code: string; name: string }
 type Task = {
@@ -125,7 +126,7 @@ export default function AssistantTasksPanel() {
           <Space wrap><Typography.Text strong>{task.goal}</Typography.Text><Tag color={task.status === 'COMPLETED' ? 'green' : task.status === 'FAILED' ? 'red' : task.status === 'CANCELLED' ? 'default' : 'blue'}>{statusLabel[task.status] || task.status}</Tag></Space>
           <Typography.Text type="secondary" copyable={{ text: task.run_id }}>Run ID：{task.run_id}</Typography.Text>
           <Typography.Text type="secondary">范围：{[task.scope.shop_id && `店铺 ${shops.find((shop) => shop.id === task.scope.shop_id)?.code || task.scope.shop_id}`, task.scope.sku_code && `SKU ${task.scope.sku_code}`, task.scope.date_from && `${task.scope.date_from} 至 ${task.scope.date_to}（${task.scope.shop_timezone}）`].filter(Boolean).join(' · ') || '当前账号授权范围'}</Typography.Text>
-          {task.result?.reply && <Alert type="success" showIcon message="只读查询结果" description={<><div style={{ whiteSpace: 'pre-wrap' }}>{task.result.reply}</div>{!!task.result.sources?.length && <Space wrap style={{ marginTop: 8 }}>{task.result.sources.map((source) => <Tag key={source}>{source}</Tag>)}</Space>}</>} />}
+          {task.result?.reply && <AssistantTaskResult reply={task.result.reply} sources={task.result.sources} />}
           {task.error_summary && <Alert type="error" showIcon message={task.error_summary} description={task.error_code} />}
           <Space><Button size="small" onClick={() => void showTrace(task)}>查看 Trace</Button>{cancellableStatuses.has(task.status) && <Popconfirm title="取消这项任务？" onConfirm={() => void cancel(task)}><Button size="small" danger>取消任务</Button></Popconfirm>}</Space>
         </Space>
