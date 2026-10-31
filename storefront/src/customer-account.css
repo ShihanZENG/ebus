@@ -1,6 +1,10 @@
 .customer-account { max-width: 1080px; margin: 0 auto; }
 .customer-heading, .customer-list-toolbar, .customer-order header, .customer-order footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .customer-auth-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e4ddd5; margin: 32px 0; background: #fffefa; }
+.customer-demo-access { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 18px 22px; margin-top: 28px; border: 1px solid #d9d1c6; background: #f3eee6; }
+.customer-demo-access p { margin: 5px 0; font-size: 13px; }
+.customer-demo-access small { overflow-wrap: anywhere; color: #656e62; }
+.customer-demo-access .primary { white-space: nowrap; }
 .customer-auth-story { background: #ece7de; padding: 48px; color: #4e463b; }
 .customer-auth-story > span { font-size: 10px; letter-spacing: 2px; }
 .customer-auth-story h2 { font-size: clamp(26px, 3vw, 38px); font-weight: 500; line-height: 1.55; margin: 28px 0; }

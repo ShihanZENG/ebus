@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, errorText, request, type Customer } from './customer-api'
+import { demoCredentials, signInDemoCustomer } from './demo-account.mjs'
 import './customer-account.css'
 
 type OrderSummary = {
@@ -18,6 +19,7 @@ type AfterSalesItem = {
 }
 type Props = {
   customer: Customer | null; ready: boolean; sessionError: string; guestCount: number
+  demoEnabled: boolean
   onCustomer: (customer: Customer | null) => void; onView: (id: string) => void
   onGuestOrders: () => void; onRetrySession: () => void; onShop: () => void
 }
@@ -154,6 +156,16 @@ export default function CustomerAccount(props: Props) {
     } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) }
   }
 
+  async function demoLogin() {
+    if (busy) return
+    setBusy(true); setError('')
+    try {
+      const result = await signInDemoCustomer((path, options) => request<{ customer: Customer }>(path, options))
+      setPassword(''); setRepeat(''); setPage(1); onCustomer(result.customer)
+      window.history.replaceState({}, '', '/account/orders')
+    } catch (cause) { setError(errorText(cause)) } finally { setBusy(false) }
+  }
+
   async function logout() {
     setBusy(true); setError('')
     try {
@@ -170,6 +182,10 @@ export default function CustomerAccount(props: Props) {
     {error && <p className="alert" role="alert">{error}</p>}
     {!ready && !props.sessionError && <p role="status">正在读取顾客登录状态…</p>}
     {props.sessionError && <p className="alert" role="alert">{props.sessionError} <button onClick={props.onRetrySession}>重试连接</button></p>}
+    {!customer && ready && props.demoEnabled && <div className="customer-demo-access">
+      <div><strong>体验演示顾客账号</strong><p>首次使用会自动创建，之后可再次登录。账号为共享演示用途，请勿填写真实个人或订单资料。</p><small>用户名：{demoCredentials.username} · 密码：{demoCredentials.password}</small></div>
+      <button type="button" className="primary" disabled={busy} onClick={() => void demoLogin()}>{busy ? '正在登录…' : '一键登录演示账号'}</button>
+    </div>}
     {!customer && ready && <div className="customer-auth-grid"><div className="customer-auth-story"><span>YOUR EVERYDAY, KEPT CLOSE</span><h2>喜欢的衣服，<br />每一单都记得。</h2><p>从挑选、下单到商家出库，<br />随时回来，看看你的订单走到哪一步。</p><ul><li>订单记录随账号保存</li><li>查看最新备货与出库进度</li><li>从订单详情联系售后</li></ul></div><div className="customer-auth-card"><div className="customer-auth-tabs">{(['login', 'register'] as const).map(value => <button key={value} aria-pressed={mode === value} disabled={busy} onClick={() => { setMode(value); setError(''); setPassword(''); setRepeat('') }}>{value === 'login' ? '顾客登录' : '创建账号'}</button>)}</div><form onSubmit={event => void authenticate(event)}><label htmlFor="customer-username">用户名<input id="customer-username" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required minLength={3} maxLength={40} pattern="[a-zA-Z0-9_]+" placeholder="3–40 位字母、数字或下划线" /></label><label htmlFor="customer-password">密码<input id="customer-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={10} maxLength={128} placeholder="10–128 位密码" /></label>{mode === 'register' && <label htmlFor="customer-repeat">确认密码<input id="customer-repeat" type="password" autoComplete="new-password" value={repeat} onChange={e => setRepeat(e.target.value)} required minLength={10} maxLength={128} placeholder="再次输入密码" /></label>}<button className="primary" disabled={busy} type="submit">{busy ? '正在处理…' : mode === 'register' ? '注册并登录' : '登录，查看我的订单'}</button></form><p className="muted">这是商城顾客账号，与员工后台账号分开。用户名不区分大小写；目前暂不提供密码找回，请妥善保存。</p></div></div>}
     {customer && <><div className="customer-tabs" role="tablist" aria-label="顾客中心分栏"><button role="tab" aria-selected={view === 'orders'} onClick={() => setView('orders')}>我的订单</button><button role="tab" aria-selected={view === 'profile'} onClick={() => setView('profile')}>个人资料</button><button role="tab" aria-selected={view === 'addresses'} onClick={() => setView('addresses')}>收货地址</button><button role="tab" aria-selected={view === 'afterSales'} onClick={() => setView('afterSales')}>售后申请</button></div>
       {view === 'orders' && <><div className="customer-list-toolbar"><span>共 {total} 笔订单</span><button disabled={listBusy} onClick={() => setRevision(value => value + 1)}>刷新订单</button></div>{listError && <p className="alert" role="alert">{listError}</p>}{listBusy ? <p role="status">正在加载订单…</p> : !listError && !orders.length ? <div className="customer-empty"><h2>你的第一份喜欢，从这里开始</h2><p>当前账号还没有订单。登录后提交的订单会出现在这里。</p><button className="primary" onClick={props.onShop}>去逛逛</button></div> : orders.map(order => <article className="customer-order" key={order.public_id}><header><span>{order.public_id}</span><strong>{order.status_label}</strong></header>{order.ordered_at && <p className="muted">下单时间：{new Date(order.ordered_at).toLocaleString('zh-CN')}</p>}{order.items.map((item, index) => <p key={index}>{item.title}<small> {item.color} / {item.size} × {item.quantity}</small></p>)}<footer><span>演示订单总额 <strong>£{order.grand_total}</strong>{Number(order.discount_amount) > 0 && <small> 优惠 -£{order.discount_amount}{order.promo_code ? `（${order.promo_code}）` : ''}</small>}</span><small className={({ unpaid: 'muted', succeeded: 'payment-ok', failed: 'alert' } as Record<string, string>)[order.payment_status] || 'muted'}>支付：{{ unpaid: '未支付', succeeded: '已支付（演示）', failed: '支付失败' }[order.payment_status] || '—'}</small><button onClick={() => props.onView(order.public_id)}>订单详情 / 查看进度</button></footer></article>)}{total > 12 && <div className="customer-pagination"><button disabled={page === 1 || listBusy} onClick={() => setPage(value => value - 1)}>上一页</button><span>{page} / {Math.ceil(total / 12)}</span><button disabled={page * 12 >= total || listBusy} onClick={() => setPage(value => value + 1)}>下一页</button></div>}</>}
