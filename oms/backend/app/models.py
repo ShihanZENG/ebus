@@ -237,6 +237,18 @@ class SalesOrderItem(Record, Base):
     line_total: Mapped[float] = mapped_column(Numeric(12, 2))
 
 
+class ErpOrderMirror(Record, Base):
+    """Read-only projection of an ERP-owned Storefront order."""
+    __tablename__ = 'erp_order_mirrors'
+    erp_order_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True)
+    idempotency_key: Mapped[str] = mapped_column(String(120), unique=True)
+    contract_version: Mapped[str] = mapped_column(String(16))
+    source_order_no: Mapped[str] = mapped_column(String(120), index=True)
+    payload_digest: Mapped[str] = mapped_column(String(64))
+    snapshot: Mapped[dict] = mapped_column(JSON)
+
+
 class PaymentRecord(Record, Base):
     __tablename__ = 'payment_records'
     order_id: Mapped[str] = mapped_column(ForeignKey('sales_orders.id', ondelete='RESTRICT'), index=True)

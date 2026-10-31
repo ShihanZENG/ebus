@@ -10,6 +10,7 @@ from . import models as m, schemas as s
 from .database import engine, SessionLocal
 from .resources import CATALOG, resource_router
 from .orders import router as orders_router, resolve_router as after_sale_router, batch_router
+from .order_mirror import router as order_mirror_router
 from .wms import router as wms_router
 from .customer_tickets import router as customer_tickets_router
 from .listings import router as listings_router, sync_router
@@ -213,6 +214,7 @@ def create_app():
     for spec in CATALOG:
         app.include_router(resource_router(*spec))
     app.include_router(orders_router)
+    app.include_router(order_mirror_router)
     app.include_router(after_sale_router)
     app.include_router(batch_router)
     app.include_router(wms_router)
