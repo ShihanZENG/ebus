@@ -4,6 +4,8 @@
 
 **2026-10-26 增量进展：** 主 ERP 已增加 `OmsOutboxEvent` 持久化表与结账同事务写入；独立 OMS 消费、双库交接契约与重试 Worker 尚未实现，P0-01 保持未关闭。`LIM_STOREFRONT_ATOMIC_HOLD=true` 时，结账采用 30 分钟库存分配预占，取消、下次结账、发货申请前的到期检查可释放预占；另有需由部署侧定时调用的鉴权接口 `POST /api/v1/storefront/holds/expire`，默认演示路径维持原行为，并需 PostgreSQL 并发验收与实际调度，P0-02 保持未关闭。启用该预占的商城订单在发货申请及最终出库前必须有足额已核验真实收款，且扣除已登记退款；没有支付网关验签契约，P0-03 保持未关闭。真实收款登记强制填写 `external_transaction_id`，数据库唯一约束和同内容重试返回原记录；网关回调、乱序事件和模拟付款幂等仍待接入，P1-04 保持未关闭。实现位置：`backend/app/storefront/service.py`、`backend/app/storefront/routes.py`、`backend/app/orders.py`、`backend/app/wms.py`、`backend/app/payment_evidence.py`、迁移 `0048_oms_outbox_foundation.py`。
 
+**2026-10-31 增量进展：** ERP 订单作为权威记录，Storefront 结账事件可经重试 Worker 送入独立 OMS 的只读订单镜像；镜像以 ERP 订单 ID、事件 ID 和幂等键去重，员工可按 ERP 订单 ID 查询。双库隔离测试已覆盖 OMS 入库后确认响应丢失并重试，仅产生一条镜像。交接需要部署 `OMS_BRIDGE_URL`、双方一致的 `OMS_BRIDGE_SECRET` 并持续运行 Worker，见 [订单镜像运行说明](docs/oms/订单镜像运行说明.md)。当前镜像只覆盖创建时快照，状态变更、取消、付款、履约回传及自动对账仍属 P1-01；P0-01 的本阶段最小交接已实现，但完整业务闭环未关闭。
+
 ## P0：阻断核心闭环
 
 1. **P0-01 确定订单权威系统并建立 Storefront → 独立 OMS 的受控订单入口。** 当前 Storefront 直接写主 ERP `SalesOrder`，独立 OMS 使用另一数据库；先明确订单 ID、店铺/SKU 映射、金额/币种、地址、权限、状态及幂等键的版本化契约，再实现单一权威写入和可追踪交接。验收：隔离双库中，同一商城提交只产生一张权威订单；OMS 查询与 ERP 关联记录共享相关 ID，重复提交不多建单；任一交接失败有可重试状态和审计记录。影响：涉及商城结账、双库订单数据所有权和已有主库订单兼容。回滚：保留原演示路径的特性开关及只读旧订单查询，停止新路径写入；已提交订单按相关 ID 对账，不做自动删除。[backend/app/storefront/service.py:161](backend/app/storefront/service.py#L161)、[oms/backend/app/database.py:5](oms/backend/app/database.py#L5)
@@ -25,4 +27,4 @@
 
 ## 下一项开发任务
 
-**先执行 P0-01：确定订单权威系统和商城订单接入契约，并在隔离双库中落地最小可验证交接。** 它是后续预占、支付状态和取消同步的共同前提；当前两个订单实现和数据库没有共享所有权。[backend/app/storefront/service.py:161](backend/app/storefront/service.py#L161)、[oms/backend/app/database.py:5](oms/backend/app/database.py#L5)
+**下一步执行 P1-01：在订单镜像基础上同步权威状态事件，并加入跨库对账与人工重试入口。** 当前创建时快照可交接，但订单审核、取消、付款和履约结果仍不会自动更新镜像。[backend/app/oms_outbox_delivery.py](backend/app/oms_outbox_delivery.py)、[oms/backend/app/order_mirror.py](oms/backend/app/order_mirror.py)

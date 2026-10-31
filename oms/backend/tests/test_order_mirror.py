@@ -30,7 +30,8 @@ def bridge(monkeypatch):
         with factory() as db:
             yield db
     app.dependency_overrides[session_db] = scoped_session
-    app.dependency_overrides[current_user] = lambda: SimpleNamespace(id='staff', role_id=role_id)
+    app.dependency_overrides[current_user] = lambda: SimpleNamespace(
+        id='staff', role_id=role_id, shop_scope=None, warehouse_scope=None)
     with TestClient(app) as client:
         yield client, factory
     engine.dispose()
@@ -86,3 +87,14 @@ def test_staff_can_read_mirror_without_oms_order_mutation(bridge):
     assert found.json()['read_only'] is True
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(m.SalesOrder)) == 0
+
+
+def test_scoped_staff_cannot_read_opaque_erp_shop_mirror(bridge):
+    client, factory = bridge
+    client.post('/internal/erp-order-mirrors', json=event(),
+                headers={'X-OMS-Bridge-Secret': 'local-test-secret'})
+    with factory() as db:
+        role_id = db.scalar(select(m.Role.id))
+    client.app.dependency_overrides[current_user] = lambda: SimpleNamespace(
+        id='staff', role_id=role_id, shop_scope=['oms-shop'], warehouse_scope=None)
+    assert client.get('/api/v1/erp-order-mirrors/erp-order-1').status_code == 404

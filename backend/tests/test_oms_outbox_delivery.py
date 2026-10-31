@@ -77,6 +77,19 @@ def test_wrong_ack_is_not_delivery(storefront):
         assert db.get(m.OmsOutboxEvent, event_id).delivered_at is None
 
 
+def test_non_object_success_response_is_retryable(storefront):
+    client, _, engine, _, _, _, product = storefront
+    event_id = pending_event(client, engine, product)
+    with httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, content=b'null',
+                                           headers={'Content-Type': 'application/json'}))) as transport:
+        result = deliver_once(sessions(engine), transport, 'http://127.0.0.1:18090',
+                              'test-secret', datetime(2026, 10, 31))
+    assert result['status'] == 'pending'
+    with sessions(engine)() as db:
+        assert db.get(m.OmsOutboxEvent, event_id).last_error
+
+
 def test_live_lease_prevents_competing_claim(storefront):
     client, _, engine, _, _, _, product = storefront
     event_id = pending_event(client, engine, product)

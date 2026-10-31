@@ -35,11 +35,11 @@
 
 **Interfaces:** `POST /internal/erp-order-mirrors` accepts `{event_id,idempotency_key,contract_version,event_type,payload}` with `X-OMS-Bridge-Secret`; `GET /api/v1/erp-order-mirrors/{erp_order_id}` requires `orders:read`. It returns the mirror ID, ERP order ID, source order number, digest, and received time. The payload's ERP IDs are opaque in OMS.
 
-- [ ] Write failing endpoint tests for authentication, first ingest, identical replay, changed replay, and staff readback.
-- [ ] Run isolated OMS test and observe failures.
-- [ ] Add model, schema validation, constant-time secret check, and insert/read endpoints.
-- [ ] Run isolated OMS test to green, then the OMS test suite.
-- [ ] Commit the task's files.
+- [x] Write failing endpoint tests for authentication, first ingest, identical replay, changed replay, and staff readback.
+- [x] Run isolated OMS test and observe failures.
+- [x] Add model, schema validation, constant-time secret check, and insert/read endpoints.
+- [x] Run isolated OMS test to green, then the OMS test suite.
+- [x] Commit the task's files.
 
 ### Task 2: ERP outbox delivery and retry
 
@@ -47,11 +47,11 @@
 
 **Interfaces:** `deliver_once(session_factory, transport, oms_url, secret, now)` claims one eligible event, posts to the OMS endpoint, verifies the acknowledgment references the same ERP order and event key, and marks it delivered. Failure increments attempts, sets `next_attempt_at`, and records a bounded error. CLI `python -m app.oms_outbox_delivery --once|--loop` reads `OMS_BRIDGE_URL` and `OMS_BRIDGE_SECRET`.
 
-- [ ] Write failing tests for successful delivery, transient failure and retry, incorrect acknowledgment, and competing claim.
-- [ ] Run isolated ERP test and observe failures.
-- [ ] Implement claim, delivery, acknowledgment check, retry and CLI loop.
-- [ ] Run isolated ERP tests to green and the relevant Storefront bridge suite.
-- [ ] Commit the task's files.
+- [x] Write failing tests for successful delivery, transient failure and retry, incorrect acknowledgment, and competing claim.
+- [x] Run isolated ERP test and observe failures.
+- [x] Implement claim, delivery, acknowledgment check, retry and CLI loop.
+- [x] Run isolated ERP tests to green and the relevant Storefront bridge suite.
+- [x] Commit the task's files.
 
 ### Task 3: Cross-system proof and operator instructions
 
@@ -59,8 +59,8 @@
 
 **Interfaces:** An ERP outbox event delivered twice creates exactly one OMS mirror; a failed delivery stays retryable; staff can read the mirror by ERP order ID. Document configuration and the read-only boundary.
 
-- [ ] Write the failing integration test using isolated databases and an in-process OMS transport.
-- [ ] Run the test and observe failure.
-- [ ] Complete any contract mapping needed for the two apps to interoperate.
-- [ ] Run the integration test, relevant backend and OMS suites, and inspect the final diff.
+- [x] Write an integration contract test using isolated databases and an in-process OMS transport.
+- [x] Run the test; the previously implemented contracts passed without further mapping.
+- [x] Confirm no additional contract mapping is needed for the two apps to interoperate.
+- [x] Run the integration test, relevant backend and OMS suites, and inspect the final diff.
 - [ ] Commit only the plan's files and push `main` to `ebus`.

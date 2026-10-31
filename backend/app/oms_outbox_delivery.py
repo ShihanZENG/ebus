@@ -45,6 +45,8 @@ def deliver_once(session_factory, transport, oms_url: str, secret: str, now: dat
             json=body, headers={'X-OMS-Bridge-Secret': secret}, timeout=10)
         response.raise_for_status()
         acknowledgment = response.json()
+        if not isinstance(acknowledgment, dict):
+            raise ValueError('OMS acknowledgment must be a JSON object')
         if (acknowledgment.get('event_id') != body['event_id'] or
                 acknowledgment.get('idempotency_key') != body['idempotency_key'] or
                 acknowledgment.get('erp_order_id') != body['payload']['order_id'] or

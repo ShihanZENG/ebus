@@ -90,6 +90,9 @@ def ingest(event: InboundEvent, secret: str | None = Header(default=None, alias=
 
 @router.get('/api/v1/erp-order-mirrors/{erp_order_id}')
 def read_mirror(erp_order_id: str, db=Depends(session_db), user=Depends(require('orders:read'))):
+    # ERP IDs have no mapping to OMS shop/warehouse scopes yet. Fail closed.
+    if user.shop_scope is not None or user.warehouse_scope is not None:
+        raise HTTPException(404, 'ERP 订单镜像不存在')
     row = db.scalar(select(m.ErpOrderMirror).where(m.ErpOrderMirror.erp_order_id == erp_order_id))
     if not row:
         raise HTTPException(404, 'ERP 订单镜像不存在')
