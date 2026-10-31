@@ -1,0 +1,16 @@
+.effect-overview-card .ant-card-body { min-width: 0; }
+.effect-overview-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; padding-bottom: 14px; color: #8c8c8c; font-size: 13px; }
+.effect-overview-meta .ant-typography { margin-left: 5px; color: #595959; font-size: 13px; }
+.effect-overview-metrics { border: 1px solid #f0f0f0; border-radius: 8px; overflow: hidden; }
+.effect-overview-metric { display: grid; grid-template-columns: minmax(100px, 1.4fr) minmax(80px, 1fr) minmax(70px, 1fr) minmax(80px, 1fr); gap: 8px; align-items: center; padding: 10px 12px; }
+.effect-overview-metric + .effect-overview-metric { border-top: 1px solid #f0f0f0; }
+.effect-overview-metric-head { background: #fafafa; color: #8c8c8c; font-size: 12px; }
+.effect-overview-name { font-weight: 500; }
+.effect-overview-value { min-width: 0; overflow-wrap: anywhere; }
+.effect-overview-value .ant-tag { margin-right: 0; white-space: normal; }
+@media (max-width: 600px) {
+  .effect-overview-metric-head { display: none; }
+  .effect-overview-metric { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; }
+  .effect-overview-name { grid-column: 1 / -1; }
+  .effect-overview-value::before { content: attr(data-label); display: block; margin-bottom: 3px; color: #8c8c8c; font-size: 12px; font-weight: normal; }
+}
